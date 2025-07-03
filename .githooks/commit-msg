@@ -1,0 +1,11 @@
+#!/bin/sh
+# Validate commit message format
+
+commit_regex='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .{1,50}'
+
+if ! grep -qE "$commit_regex" "$1"; then
+    echo "Invalid commit message format!"
+    echo "Use: <type>(<scope>): <description>"
+    echo "Example: feat(cli): add project validation"
+    exit 1
+fi
