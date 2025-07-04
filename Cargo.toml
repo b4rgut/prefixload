@@ -13,6 +13,8 @@ authors = ["Aleksey Kalsin <aleksey@kalsin.pro>"]
 [dependencies]
 aws-sdk-s3 = "1.96.0"
 clap = { version = "4.5.40", features = ["derive"] }
+dialoguer = { version = "0.11.0", features = ["password"] }
+thiserror = "2.0.12"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }

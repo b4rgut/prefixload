@@ -1,24 +1,12 @@
-use std::{error, fmt, io, result};
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PrefixloadError {
-    Io(io::Error),
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Input error: {0}")]
+    Dialoguer(#[from] dialoguer::Error),
 }
 
-impl fmt::Display for PrefixloadError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            PrefixloadError::Io(err) => write!(f, "IO error: {}", err),
-        }
-    }
-}
-
-impl error::Error for PrefixloadError {}
-
-impl From<io::Error> for PrefixloadError {
-    fn from(err: io::Error) -> Self {
-        PrefixloadError::Io(err)
-    }
-}
-
-pub type Result<T> = result::Result<T, PrefixloadError>;
+pub type Result<T> = std::result::Result<T, PrefixloadError>;
