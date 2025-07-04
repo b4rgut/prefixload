@@ -1,13 +1,13 @@
 [package]
 name = "prefixload"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
 description = "S3 cli backuper"
 license = "MIT"
 repository = "https://github.com/b4rgut/prefixload"
 readme = "README.md"
-keywords = ["S3", "backup", "cli"]
-categories = ["command-line-utilities", "backup", "S3"]
+keywords = ["S3", "backup", "aws"]
+categories = ["command-line-utilities", "filesystem"]
 authors = ["Aleksey Kalsin <aleksey@kalsin.pro>"]
 
 [dependencies]
