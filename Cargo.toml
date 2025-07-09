@@ -14,9 +14,14 @@ authors = ["Aleksey Kalsin <aleksey@kalsin.pro>"]
 aws-sdk-s3 = "1.96.0"
 clap = { version = "4.5.40", features = ["derive"] }
 dialoguer = { version = "0.11.0", features = ["password"] }
+dirs-next = "2.0.0"
+rust-embed = "8.7.2"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
 thiserror = "2.0.12"
+
+[dev-dependencies]
+tempfile = "3.20.0"
 
 [lints.clippy]
 all = { level = "warn", priority = -1 }
