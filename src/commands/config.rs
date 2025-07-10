@@ -1,7 +1,7 @@
 use crate::cli::{ConfigCommand, ConfigSetArgs, DirectoryAddArgs, DirectoryRemoveArgs};
+use crate::config::{Config, DirectoryEntry};
 use crate::error::Result;
 use rust_embed::RustEmbed;
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self};
 use std::path::PathBuf;
@@ -11,49 +11,6 @@ use std::path::PathBuf;
 #[derive(RustEmbed)]
 #[folder = "assets/"]
 struct Asset;
-
-/// Represents a mapping from a file prefix to a cloud directory.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct DirectoryEntry {
-    pub prefix_file: String,
-    pub cloud_dir: String,
-}
-
-/// Represents the application's YAML configuration file.
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Config {
-    pub endpoint: String,
-    pub backet: String,
-    pub part_size: u64,
-    pub local_directory_path: String,
-    pub directory_struct: Vec<DirectoryEntry>,
-}
-
-/// Returns the full path to the platform-native config file.
-/// - Linux/macOS: ~/.config/prefixload/config.yml
-/// - Windows: %APPDATA%\prefixload\config.yml
-fn config_path() -> PathBuf {
-    let mut dir = dirs_next::config_dir().expect("Cannot get config directory");
-    dir.push("prefixload");
-    if !dir.exists() {
-        fs::create_dir_all(&dir).expect("Cannot create config directory");
-    }
-    dir.push("config.yaml");
-    dir
-}
-
-/// Ensures that the config file exists at the standard path.
-/// If not, writes the embedded default config.yml from the binary.
-fn ensure_config_exists(path: &PathBuf) -> Result<()> {
-    if !path.exists() {
-        let bytes = Asset::get("config.yml")
-            .expect("Embedded config.yaml not found")
-            .data;
-        std::fs::write(path, bytes)?;
-        println!("Default config.yml written to {}", path.display());
-    }
-    Ok(())
-}
 
 /// Returns the default text editor command for this platform.
 /// - Windows: notepad
@@ -168,6 +125,33 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs, path: &PathBuf) -> Result<()
         println!("No entry with such prefix_file found.");
     }
 
+    Ok(())
+}
+
+/// Returns the full path to the platform-native config file.
+/// - Linux/macOS: ~/.config/prefixload/config.yml
+/// - Windows: %APPDATA%\prefixload\config.yml
+fn config_path() -> PathBuf {
+    let mut dir = dirs_next::config_dir().expect("Cannot get config directory");
+    dir.push("prefixload");
+    if !dir.exists() {
+        fs::create_dir_all(&dir).expect("Cannot create config directory");
+    }
+    dir.push("config.yml");
+
+    dir
+}
+
+/// Ensures that the config file exists at the standard path.
+/// If not, writes the embedded default config.yml from the binary.
+fn ensure_config_exists(path: &PathBuf) -> Result<()> {
+    if !path.exists() {
+        let bytes = Asset::get("config.yml")
+            .expect("Embedded config.yaml not found")
+            .data;
+        std::fs::write(path, bytes)?;
+        println!("Default config.yml written to {}", path.display());
+    }
     Ok(())
 }
 
