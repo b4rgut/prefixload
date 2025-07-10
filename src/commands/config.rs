@@ -95,10 +95,7 @@ fn handle_config_set(args: &ConfigSetArgs, path: &PathBuf) -> Result<()> {
     let backup_path = path.clone();
     backup_config(&backup_path)?;
 
-    let mut config: Config = {
-        let s = fs::read_to_string(&path)?;
-        serde_yaml::from_str(&s)?
-    };
+    let mut config: Config = Config::load(&path)?;
 
     if let Some(val) = &args.endpoint {
         config.endpoint = val.to_string();
@@ -113,8 +110,8 @@ fn handle_config_set(args: &ConfigSetArgs, path: &PathBuf) -> Result<()> {
         config.local_directory_path = val.to_string();
     }
 
-    let s = serde_yaml::to_string(&config)?;
-    fs::write(&path, s)?;
+    config.save(&path)?;
+
     println!("Config updated.");
 
     Ok(())
@@ -126,10 +123,7 @@ fn handle_config_dir_add(args: &DirectoryAddArgs, path: &PathBuf) -> Result<()> 
     let backup_path = path.clone();
     backup_config(&backup_path)?;
 
-    let mut config: Config = {
-        let s = fs::read_to_string(&path)?;
-        serde_yaml::from_str(&s)?
-    };
+    let mut config: Config = Config::load(&path)?;
 
     if config
         .directory_struct
@@ -143,8 +137,7 @@ fn handle_config_dir_add(args: &DirectoryAddArgs, path: &PathBuf) -> Result<()> 
             cloud_dir: args.cloud_dir.to_string(),
         });
 
-        let s = serde_yaml::to_string(&config)?;
-        fs::write(&path, s)?;
+        config.save(&path)?;
 
         println!("Directory entry added.");
     }
@@ -158,19 +151,14 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs, path: &PathBuf) -> Result<()
     let backup_path = path.clone();
     backup_config(&backup_path)?;
 
-    let mut config: Config = {
-        let s = fs::read_to_string(&path)?;
-        serde_yaml::from_str(&s)?
-    };
+    let mut config: Config = Config::load(&path)?;
 
     let old_len = config.directory_struct.len();
     config
         .directory_struct
         .retain(|entry| entry.prefix_file != args.prefix_file);
     if config.directory_struct.len() < old_len {
-        let s = serde_yaml::to_string(&config)?;
-        fs::write(&path, s)?;
-
+        config.save(&path)?;
         println!("Directory entry removed.");
     } else {
         println!("No entry with such prefix_file found.");
