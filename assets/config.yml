@@ -1,5 +1,4 @@
 # === PREFIXLOAD TOOL CONFIGURATION ===
-
 # The endpoint URL of your S3-compatible storage
 endpoint: "s3.example.com"
 

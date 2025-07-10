@@ -12,6 +12,44 @@ use std::path::PathBuf;
 #[folder = "assets/"]
 struct Asset;
 
+/// Returns the full path to the platform-native config file.
+/// - Linux/macOS: ~/.config/prefixload/config.yml
+/// - Windows: %APPDATA%\prefixload\config.yml
+fn config_path() -> PathBuf {
+    let mut dir = dirs_next::config_dir().expect("Cannot get config directory");
+    dir.push("prefixload");
+    if !dir.exists() {
+        fs::create_dir_all(&dir).expect("Cannot create config directory");
+    }
+    dir.push("config.yml");
+
+    dir
+}
+
+/// Ensures that the config file exists at the standard path.
+/// If not, writes the embedded default config.yml from the binary.
+fn ensure_config_exists(path: &PathBuf) -> Result<()> {
+    if !path.exists() {
+        let bytes = Asset::get("config.yml")
+            .expect("Embedded config.yaml not found")
+            .data;
+        std::fs::write(path, bytes)?;
+        println!("Default config.yml written to {}", path.display());
+    }
+    Ok(())
+}
+
+/// Creates or updates a backup of the config file as `config.yml.bak` before making changes.
+fn backup_config(path: &PathBuf) -> Result<()> {
+    if path.exists() {
+        let mut backup_path = path.clone();
+        backup_path.set_extension("yml.bak"); // config.yml.bak
+        std::fs::copy(path, &backup_path)?;
+        println!("Backup created at {}", backup_path.display());
+    }
+    Ok(())
+}
+
 /// Returns the default text editor command for this platform.
 /// - Windows: notepad
 /// - Linux/macOS: nano
@@ -43,13 +81,20 @@ fn handle_config_show(path: &PathBuf) -> Result<()> {
 
 /// Opens the config file in an editor for manual modification.
 fn handle_config_edit(path: &PathBuf) -> Result<()> {
+    let backup_path = path.clone();
+    backup_config(&backup_path)?;
+
     edit_config_in_editor(&path)?;
+
     Ok(())
 }
 
 /// Updates one or more top-level config fields (endpoint, backet, part_size, local_directory_path).
 /// Only updates fields provided as Some(value).
 fn handle_config_set(args: &ConfigSetArgs, path: &PathBuf) -> Result<()> {
+    let backup_path = path.clone();
+    backup_config(&backup_path)?;
+
     let mut config: Config = {
         let s = fs::read_to_string(&path)?;
         serde_yaml::from_str(&s)?
@@ -78,6 +123,9 @@ fn handle_config_set(args: &ConfigSetArgs, path: &PathBuf) -> Result<()> {
 /// Adds a new directory mapping to the config's directory_struct.
 /// Skips addition if the prefix_file already exists.
 fn handle_config_dir_add(args: &DirectoryAddArgs, path: &PathBuf) -> Result<()> {
+    let backup_path = path.clone();
+    backup_config(&backup_path)?;
+
     let mut config: Config = {
         let s = fs::read_to_string(&path)?;
         serde_yaml::from_str(&s)?
@@ -107,6 +155,9 @@ fn handle_config_dir_add(args: &DirectoryAddArgs, path: &PathBuf) -> Result<()> 
 /// Removes a directory mapping from the config's directory_struct by prefix_file.
 /// Notifies the user if no such entry was found.
 fn handle_config_dir_rm(args: &DirectoryRemoveArgs, path: &PathBuf) -> Result<()> {
+    let backup_path = path.clone();
+    backup_config(&backup_path)?;
+
     let mut config: Config = {
         let s = fs::read_to_string(&path)?;
         serde_yaml::from_str(&s)?
@@ -125,33 +176,6 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs, path: &PathBuf) -> Result<()
         println!("No entry with such prefix_file found.");
     }
 
-    Ok(())
-}
-
-/// Returns the full path to the platform-native config file.
-/// - Linux/macOS: ~/.config/prefixload/config.yml
-/// - Windows: %APPDATA%\prefixload\config.yml
-fn config_path() -> PathBuf {
-    let mut dir = dirs_next::config_dir().expect("Cannot get config directory");
-    dir.push("prefixload");
-    if !dir.exists() {
-        fs::create_dir_all(&dir).expect("Cannot create config directory");
-    }
-    dir.push("config.yml");
-
-    dir
-}
-
-/// Ensures that the config file exists at the standard path.
-/// If not, writes the embedded default config.yml from the binary.
-fn ensure_config_exists(path: &PathBuf) -> Result<()> {
-    if !path.exists() {
-        let bytes = Asset::get("config.yml")
-            .expect("Embedded config.yaml not found")
-            .data;
-        std::fs::write(path, bytes)?;
-        println!("Default config.yml written to {}", path.display());
-    }
     Ok(())
 }
 
