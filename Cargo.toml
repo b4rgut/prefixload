@@ -1,0 +1,28 @@
+[package]
+name = "prefixload"
+version = "0.1.0"
+edition = "2024"
+description = "S3 cli backup by file name prefix"
+license = "MIT"
+repository = "https://github.com/b4rgut/prefixload"
+readme = "README.md"
+keywords = ["S3", "backup", "aws"]
+categories = ["command-line-utilities", "filesystem"]
+authors = ["Aleksey Kalsin <aleksey@kalsin.pro>"]
+
+[profile.dev]
+opt-level = 0 # No optimization for fast compile times
+debug = true  # Include debug symbols
+
+[profile.release]
+opt-level = 3 # Maximum optimization for performance
+debug = false # Exclude debug symbols for smaller binary size
+lto = true    # Link-Time Optimization for further size reduction
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+
+[dependencies]
