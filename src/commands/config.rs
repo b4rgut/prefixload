@@ -154,7 +154,7 @@ mod tests {
         };
 
         let msg = handle_config_set(&args).expect("set");
-        assert_eq!(msg, "Config updated!\n");
+        assert_eq!(msg, "Config updated!");
 
         let cfg = Config::load().unwrap();
         assert_eq!(cfg.endpoint, "http://example.com");
