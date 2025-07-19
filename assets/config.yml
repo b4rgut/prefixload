@@ -1,0 +1,27 @@
+# === PREFIXLOAD TOOL CONFIGURATION ===
+# The endpoint URL of your S3-compatible storage
+endpoint: "https://s3.example.com"
+
+# The name of your S3 bucket to upload files to
+bucket: "name_bucket"
+
+# The upload part size in bytes (for multipart upload; 15728640 = 15MB)
+part_size: 15728640
+
+# Path to the local directory where your backups are stored
+local_directory_path: "/path/to/file"
+
+# Mapping rules for uploading specific files to specific cloud subdirectories
+directory_struct:
+  # Each entry defines a file prefix and the corresponding cloud directory in the bucket.
+  # Example: A file named "prefix_1_backup_somefile.sql" will be uploaded to "name_backet/prefix_1/prefix_1_backup_somefile.sql"
+
+  - prefix_file: "prefix_1_backup" # Local files starting with this prefix
+    cloud_dir: "prefix_1" # Will be uploaded into this directory inside the bucket
+
+  - prefix_file: "prefix_2_backup"
+    cloud_dir: "prefix_2"
+
+  - prefix_file: "prefix_3_backup"
+    cloud_dir: "prefix_3"
+# === END OF CONFIGURATION ===
