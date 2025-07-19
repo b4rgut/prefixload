@@ -84,9 +84,93 @@ impl S3Client {
     /// - `Err(e)`    – other errors (network, DNS, incorrect region, etc.)
     pub async fn check_bucket_access(&self, bucket: &str) -> Result<bool> {
         match self.inner.head_bucket().bucket(bucket).send().await {
+            // 200 OK – the bucket exists and the credentials are valid
             Ok(_) => Ok(true),
-            Err(e) if matches!(e.code(), Some("AccessDenied" | "Forbidden")) => Ok(false),
-            Err(e) => Err(aws_sdk_s3::Error::from(e).into()),
+
+            Err(sdk_err) => {
+                // 403 Forbidden or 401 Unauthorized ⇢ the bucket is there, but there are no rights
+                if matches!(sdk_err.code(), Some("AccessDenied") | Some("Forbidden")) {
+                    return Ok(false);
+                }
+
+                // Everything else (404 NotFound, PermanentRedirect, network failures, etc.)
+                // wrap it in our Error tree and throw it up.
+                let aws_err: aws_sdk_s3::Error = sdk_err.into();
+                Err(aws_err.into())
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path_regex};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const AK: &str = "TEST_AK";
+    const SK: &str = "TEST_SK";
+
+    /// Helper: build client pointed to wiremock
+    async fn client(server: &MockServer) -> S3Client {
+        S3Client::new(S3ClientOptions {
+            access_key: AK,
+            secret_key: SK,
+            region: None,                  // default us-east-1
+            endpoint: Some(&server.uri()), // plain-http mock
+            force_path_style: true,
+        })
+        .await
+        .expect("client init")
+    }
+
+    #[tokio::test]
+    async fn bucket_exists_returns_true() {
+        let server = MockServer::start().await;
+        let bucket = "mybucket";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(r"^/mybucket(/)?$")) // ← tolerate optional '/'
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let ok = client(&server)
+            .await
+            .check_bucket_access(bucket)
+            .await
+            .unwrap(); // should be Ok(true)
+
+        assert!(ok);
+    }
+
+    #[tokio::test]
+    async fn not_found_propagates_error() {
+        let server = MockServer::start().await;
+        let bucket = "missing";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(r"^/missing(/)?$"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let err = client(&server)
+            .await
+            .check_bucket_access(bucket)
+            .await
+            .expect_err("should be Err");
+
+        // basic sanity: make sure original S3 error code preserved
+        assert!(format!("{err:?}").contains("NotFound"));
+    }
+
+    #[tokio::test]
+    async fn default_region_is_us_east_1() {
+        let server = MockServer::start().await;
+        let cli = client(&server).await;
+
+        let region = cli.inner.config().region().unwrap().as_ref();
+        assert_eq!(region, "us-east-1");
     }
 }
