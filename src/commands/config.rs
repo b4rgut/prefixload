@@ -1,7 +1,6 @@
 use crate::cli::{ConfigCommand, ConfigSetArgs, DirectoryAddArgs, DirectoryRemoveArgs};
 use crate::config::{Config, DirectoryEntry};
 use crate::error::Result;
-use std::io::{self, Write};
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
@@ -11,11 +10,8 @@ use syntect::util::{LinesWithEndings, as_24_bit_terminal_escaped};
 fn handle_config_show() -> Result<String> {
     let content = Config::read_to_string()?;
 
-    // Load syntax definitions and themes
     let ps = SyntaxSet::load_defaults_newlines();
     let ts = ThemeSet::load_defaults();
-
-    // Try to use "yaml" syntax, fallback to plain if not found
     let syntax = ps
         .find_syntax_by_extension("yml")
         .or_else(|| ps.find_syntax_by_extension("yaml"))
@@ -23,17 +19,15 @@ fn handle_config_show() -> Result<String> {
 
     let theme = &ts.themes["base16-ocean.dark"];
     let mut h = HighlightLines::new(syntax, theme);
-
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
+    let mut buf = String::with_capacity(content.len() * 2);
 
     for line in LinesWithEndings::from(&content) {
-        let ranges = h.highlight_line(line, &ps).unwrap();
+        let ranges = h.highlight_line(line, &ps)?;
         let escaped = as_24_bit_terminal_escaped(&ranges[..], false);
-        write!(handle, "{}", escaped)?;
+        buf.push_str(&escaped);
     }
 
-    Ok("".to_string())
+    Ok(buf)
 }
 
 /// Opens the config file in the user's preferred editor.
