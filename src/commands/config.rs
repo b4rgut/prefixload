@@ -58,7 +58,7 @@ fn handle_config_set(args: &ConfigSetArgs) -> Result<String> {
 
     config.save()?;
 
-    Ok("Config updated!\n".to_string())
+    Ok("Config updated!".to_string())
 }
 
 /// Adds a new directory mapping to the config's directory_struct.
