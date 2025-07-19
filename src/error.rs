@@ -10,6 +10,9 @@ pub enum PrefixloadError {
 
     #[error("Error [Syntect]: {0}")]
     Syntect(#[from] syntect::Error),
+
+    #[error("Error [AWS SDK S3]: {0}")]
+    AWS(#[from] aws_sdk_s3::Error),
 }
 
 pub type Result<T> = std::result::Result<T, PrefixloadError>;
