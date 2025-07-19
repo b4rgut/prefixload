@@ -120,3 +120,126 @@ pub async fn run(cmd: ConfigCommand) -> Result<String> {
         ConfigCommand::DirRm(args) => Ok(handle_config_dir_rm(&args)?),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::env;
+    use tempfile::TempDir;
+
+    // Environment variable that `dirs_next::config_dir()` consults
+    #[cfg(windows)]
+    const CONFIG_ENV: &str = "APPDATA";
+    #[cfg(not(windows))]
+    const CONFIG_ENV: &str = "XDG_CONFIG_HOME";
+
+    /// Creates a temporary config directory and points the OS-specific
+    /// config env-var at it so all file IO is sandboxed.
+    fn temp_config_dir() -> TempDir {
+        let tmp = TempDir::new().expect("temp dir");
+        // `set_var` became unsafe in recent toolchains
+        unsafe { env::set_var(CONFIG_ENV, tmp.path()) };
+        tmp
+    }
+
+    // ---------------------------------------------------------------------
+    // handle_config_set
+    // ---------------------------------------------------------------------
+
+    #[test]
+    #[serial]
+    fn config_set_updates_requested_fields() {
+        let _guard = temp_config_dir();
+
+        let args = ConfigSetArgs {
+            endpoint: Some("http://example.com".into()),
+            backet: Some("mybucket".into()), // NB: field name in CLI struct
+            part_size: Some(123),
+            local_directory_path: Some("/tmp/data".into()),
+        };
+
+        let msg = handle_config_set(&args).expect("set");
+        assert_eq!(msg, "Config updated!\n");
+
+        let cfg = Config::load().unwrap();
+        assert_eq!(cfg.endpoint, "http://example.com");
+        assert_eq!(cfg.bucket, "mybucket");
+        assert_eq!(cfg.part_size, 123);
+        assert_eq!(cfg.local_directory_path, "/tmp/data");
+    }
+
+    // ---------------------------------------------------------------------
+    // handle_config_dir_add
+    // ---------------------------------------------------------------------
+
+    #[test]
+    #[serial]
+    fn dir_add_appends_and_skips_duplicate() {
+        let _guard = temp_config_dir();
+
+        let add_args = DirectoryAddArgs {
+            prefix_file: "PRE".into(),
+            cloud_dir: "dir1/".into(),
+        };
+
+        // First insertion succeeds
+        let msg1 = handle_config_dir_add(&add_args).expect("dir add 1");
+        assert_eq!(msg1, "Directory entry added.");
+
+        let cfg_after_first = Config::load().unwrap();
+        let initial_len = cfg_after_first.directory_struct.len();
+        assert!(
+            cfg_after_first
+                .directory_struct
+                .iter()
+                .any(|e| e.prefix_file == "PRE" && e.cloud_dir == "dir1/"),
+            "New directory mapping not found in config"
+        );
+
+        // Second insertion with the same prefix should be rejected
+        let msg2 = handle_config_dir_add(&add_args).expect("dir add 2");
+        assert_eq!(msg2, "Entry with this prefix_file already exists.");
+
+        let cfg_after_second = Config::load().unwrap();
+        assert_eq!(
+            cfg_after_second.directory_struct.len(),
+            initial_len,
+            "Duplicate entry unexpectedly modified directory_struct"
+        );
+    }
+
+    // ---------------------------------------------------------------------
+    // handle_config_dir_rm
+    // ---------------------------------------------------------------------
+
+    #[test]
+    #[serial]
+    fn dir_rm_removes_and_reports_missing() {
+        let _guard = temp_config_dir();
+
+        // Seed a mapping we can delete
+        let add_args = DirectoryAddArgs {
+            prefix_file: "DEL".into(),
+            cloud_dir: "to/delete".into(),
+        };
+        handle_config_dir_add(&add_args).unwrap();
+
+        // Remove it
+        let rm_args = DirectoryRemoveArgs {
+            prefix_file: "DEL".into(),
+        };
+        let msg1 = handle_config_dir_rm(&rm_args).expect("dir rm 1");
+        assert_eq!(msg1, "Directory entry removed.");
+
+        let cfg = Config::load().unwrap();
+        assert!(
+            cfg.directory_struct.iter().all(|e| e.prefix_file != "DEL"),
+            "Entry was not actually removed"
+        );
+
+        // Second attempt should say it does not exist
+        let msg2 = handle_config_dir_rm(&rm_args).expect("dir rm 2");
+        assert_eq!(msg2, "No entry with such prefix_file found.");
+    }
+}
