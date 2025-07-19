@@ -45,7 +45,7 @@ impl Config {
     /// Returns the full path to the platform-native config file.
     /// - Linux/macOS: ~/.config/prefixload/config.yml
     /// - Windows: %APPDATA%\prefixload\config.yml
-    pub fn config_path() -> Result<PathBuf> {
+    fn config_path() -> Result<PathBuf> {
         let mut dir = dirs_next::config_dir().expect("Failed to get config directory");
 
         dir.push("prefixload");
@@ -69,35 +69,6 @@ impl Config {
         Ok(())
     }
 
-    pub fn read_to_string() -> Result<String> {
-        let path = Self::config_path().unwrap();
-        Self::ensure_config_exists(&path)?;
-
-        let content = fs::read_to_string(&path)?;
-
-        Ok(content)
-    }
-
-    pub fn load() -> Result<Self> {
-        let path = Self::config_path().unwrap();
-        Self::ensure_config_exists(&path)?;
-
-        let s = fs::read_to_string(&path)?;
-
-        Ok(serde_yaml::from_str(&s)?)
-    }
-
-    pub fn edit() -> Result<()> {
-        let path = Self::config_path().unwrap();
-        Self::backup_config()?;
-
-        // Try $EDITOR, otherwise platform default
-        let editor = std::env::var("EDITOR").unwrap_or_else(|_| default_editor());
-        std::process::Command::new(editor).arg(path).status()?;
-
-        Ok(())
-    }
-
     /// Creates or updates a backup of the config file as `config.yml.bak` before making changes.
     fn backup_config() -> Result<()> {
         let path = Self::config_path().unwrap();
@@ -111,12 +82,59 @@ impl Config {
         Ok(())
     }
 
+    /// Reads the **raw YAML** contents of the configuration file and
+    /// returns them as a `String`.
+    ///
+    /// *Ensures:*
+    /// * The file exists (creates from embedded default if necessary).
+    /// * Parent directory is created on-demand.
+    pub fn read_to_string() -> Result<String> {
+        let path = Self::config_path().unwrap();
+        Self::ensure_config_exists(&path)?;
+
+        let content = fs::read_to_string(&path)?;
+
+        Ok(content)
+    }
+
+    /// Loads the configuration from disk and deserialises it into a
+    /// typed `Config` struct.
+    ///
+    /// Fails if YAML is syntactically invalid or cannot be read.
+    pub fn load() -> Result<Self> {
+        let path = Self::config_path().unwrap();
+        Self::ensure_config_exists(&path)?;
+
+        let s = fs::read_to_string(&path)?;
+
+        Ok(serde_yaml::from_str(&s)?)
+    }
+
+    /// Persists the current `Config` instance to disk in YAML form.
+    ///
+    /// *Creates/updates* `config.yml.bak` before overwriting the primary file
+    /// to guard against accidental data loss.
     pub fn save(&self) -> Result<()> {
         let path = Self::config_path().unwrap();
         Self::backup_config()?;
 
         let s = serde_yaml::to_string(self)?;
         fs::write(path, s)?;
+
+        Ok(())
+    }
+
+    /// Opens the configuration file in the user’s preferred editor
+    /// (`$EDITOR` → fallback to `nano`/`notepad`).
+    ///
+    /// Before editing a **backup** is created as `config.yml.bak`.
+    pub fn edit() -> Result<()> {
+        let path = Self::config_path().unwrap();
+        Self::backup_config()?;
+
+        // Try $EDITOR, otherwise platform default
+        let editor = std::env::var("EDITOR").unwrap_or_else(|_| default_editor());
+        std::process::Command::new(editor).arg(path).status()?;
 
         Ok(())
     }
