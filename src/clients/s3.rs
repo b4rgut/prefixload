@@ -18,19 +18,19 @@ pub struct S3Client {
 /// * 'force_path_style' is useful for MinIO, Ceph RGW, Wasabi and other
 /// S3-compatible services that require path-style URLs.
 #[derive(Debug, Clone)]
-pub struct S3ClientOptions<'a> {
-    pub access_key: &'a str,
-    pub secret_key: &'a str,
-    pub region: Option<&'a str>,
-    pub endpoint: Option<&'a str>,
+pub struct S3ClientOptions {
+    pub access_key: String,
+    pub secret_key: String,
+    pub region: Option<String>,
+    pub endpoint: Option<String>,
     pub force_path_style: bool,
 }
 
-impl<'a> Default for S3ClientOptions<'a> {
+impl Default for S3ClientOptions {
     fn default() -> Self {
         Self {
-            access_key: "",
-            secret_key: "",
+            access_key: "".to_string(),
+            secret_key: "".to_string(),
             region: None,
             endpoint: None,
             force_path_style: false,
@@ -38,10 +38,37 @@ impl<'a> Default for S3ClientOptions<'a> {
     }
 }
 
+impl S3ClientOptions {
+    pub fn with_access_key(mut self, access_key: String) -> Self {
+        self.access_key = access_key;
+        self
+    }
+
+    pub fn with_secret_key(mut self, secret_key: String) -> Self {
+        self.secret_key = secret_key;
+        self
+    }
+
+    pub fn with_region(mut self, region: String) -> Self {
+        self.region = Some(region);
+        self
+    }
+
+    pub fn with_endpoint(mut self, endpoint: String) -> Self {
+        self.endpoint = Some(endpoint);
+        self
+    }
+
+    pub fn with_force_path_style(mut self, force_path_style: bool) -> Self {
+        self.force_path_style = force_path_style;
+        self
+    }
+}
+
 impl S3Client {
     /// Creates a new client capable of working with both AWS
     /// and any S3-compatible service.
-    pub async fn new(opts: S3ClientOptions<'_>) -> Result<Self> {
+    pub async fn new(opts: S3ClientOptions) -> Result<Self> {
         /* ---------- учёт учётных данных ---------- */
         let credentials = Credentials::new(
             opts.access_key,
@@ -58,7 +85,7 @@ impl S3Client {
 
         let region = opts
             .region // Option<&str>
-            .unwrap_or("us-east-1"); // default
+            .unwrap_or("us-east-1".to_string()); // default
 
         cfg_loader = cfg_loader.region(Region::new(region.to_owned()));
 
@@ -114,10 +141,10 @@ mod tests {
     /// Helper: build client pointed to wiremock
     async fn client(server: &MockServer) -> S3Client {
         S3Client::new(S3ClientOptions {
-            access_key: AK,
-            secret_key: SK,
-            region: None,                  // default us-east-1
-            endpoint: Some(&server.uri()), // plain-http mock
+            access_key: AK.to_string(),
+            secret_key: SK.to_string(),
+            region: None,                 // default us-east-1
+            endpoint: Some(server.uri()), // plain-http mock
             force_path_style: true,
         })
         .await
