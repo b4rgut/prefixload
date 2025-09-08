@@ -1,6 +1,6 @@
 [package]
 name = "prefixload"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2024"
 description = "S3 cli backup by file name prefix"
 license = "MIT"
