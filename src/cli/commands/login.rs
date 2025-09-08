@@ -1,6 +1,6 @@
 use crate::clients::s3::{S3Client, S3ClientOptions};
 use crate::config::Config;
-use crate::error::Result;
+use crate::error::{PrefixloadError, Result};
 use requestty::Question;
 
 fn input_credentials() -> Result<(String, String)> {
@@ -56,5 +56,5 @@ pub async fn run() -> Result<String> {
         return Ok("Credentials have been saved successfully!".to_string());
     }
 
-    Ok("Credentials not valid".to_string())
+    Err(PrefixloadError::Custom("Credentials not valid".to_string()))
 }
