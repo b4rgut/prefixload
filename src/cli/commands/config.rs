@@ -1,6 +1,6 @@
 use crate::cli::{ConfigCommand, ConfigSetArgs, DirectoryAddArgs, DirectoryRemoveArgs};
 use crate::config::{Config, DirectoryEntry};
-use crate::error::Result;
+use crate::error::{PrefixloadError, Result};
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
@@ -71,7 +71,9 @@ fn handle_config_dir_add(args: &DirectoryAddArgs) -> Result<String> {
         .iter()
         .any(|entry| entry.prefix_file == args.prefix_file)
     {
-        return Ok("Entry with this prefix_file already exists.".to_string());
+        return Err(PrefixloadError::Custom(
+            "Entry with this prefix_file already exists.".to_string(),
+        ));
     }
 
     config.directory_struct.push(DirectoryEntry {
@@ -99,7 +101,9 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs) -> Result<String> {
         return Ok("Directory entry removed.".to_string());
     }
 
-    Ok("No entry with such prefix_file found.".to_string())
+    Err(PrefixloadError::Custom(
+        "No entry with such prefix_file found.".to_string(),
+    ))
 }
 
 /// Handles all config subcommands.
@@ -192,8 +196,8 @@ mod tests {
         );
 
         // Second insertion with the same prefix should be rejected
-        let msg2 = handle_config_dir_add(&add_args).expect("dir add 2");
-        assert_eq!(msg2, "Entry with this prefix_file already exists.");
+        let err_msg = handle_config_dir_add(&add_args).unwrap_err().to_string();
+        assert!(err_msg.contains("Entry with this prefix_file already exists."));
 
         let cfg_after_second = Config::load().unwrap();
         assert_eq!(
@@ -233,7 +237,7 @@ mod tests {
         );
 
         // Second attempt should say it does not exist
-        let msg2 = handle_config_dir_rm(&rm_args).expect("dir rm 2");
-        assert_eq!(msg2, "No entry with such prefix_file found.");
+        let msg_err = handle_config_dir_rm(&rm_args).unwrap_err().to_string();
+        assert!(msg_err.contains("No entry with such prefix_file found."));
     }
 }
