@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum PrefixloadError {
+    #[error("Error [Prefixload]: {0}")]
+    Custom(String),
+
     #[error("Error [IO]: {0}")]
     Io(#[from] std::io::Error),
 
