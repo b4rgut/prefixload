@@ -1,4 +1,5 @@
-use crate::commands;
+pub mod commands;
+
 use crate::error::Result;
 use clap::{Args, Parser, Subcommand};
 
