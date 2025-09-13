@@ -37,6 +37,15 @@ fn handle_config_edit() -> Result<String> {
     Ok("".to_string())
 }
 
+/// A generic helper for updating the config file.
+///
+/// This function abstracts the common pattern of:
+/// 1. Loading the `Config` from disk.
+/// 2. Applying a mutation to it.
+/// 3. Saving the modified `Config` back to disk.
+///
+/// It takes a closure `operation` that receives a mutable reference
+/// to the loaded config and performs the desired changes.
 fn update_config<F, R>(operation: F) -> Result<R>
 where
     F: FnOnce(&mut Config) -> Result<R>,
