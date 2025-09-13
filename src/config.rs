@@ -13,8 +13,8 @@ struct Asset;
 /// Represents a mapping from a file prefix to a cloud directory.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DirectoryEntry {
-    pub prefix_file: String,
-    pub cloud_dir: String,
+    pub local_name_prefix: String,
+    pub remote_path: String,
 }
 
 /// Represents the application's YAML configuration file.

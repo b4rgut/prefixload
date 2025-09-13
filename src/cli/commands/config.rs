@@ -62,23 +62,23 @@ fn handle_config_set(args: &ConfigSetArgs) -> Result<String> {
 }
 
 /// Adds a new directory mapping to the config's directory_struct.
-/// Skips addition if the prefix_file already exists.
+/// Skips addition if the local_name_prefix already exists.
 fn handle_config_dir_add(args: &DirectoryAddArgs) -> Result<String> {
     let mut config: Config = Config::load()?;
 
     if config
         .directory_struct
         .iter()
-        .any(|entry| entry.prefix_file == args.prefix_file)
+        .any(|entry| entry.local_name_prefix == args.local_name_prefix)
     {
         return Err(PrefixloadError::Custom(
-            "Entry with this prefix_file already exists.".to_string(),
+            "Entry with this local_name_prefix already exists.".to_string(),
         ));
     }
 
     config.directory_struct.push(DirectoryEntry {
-        prefix_file: args.prefix_file.to_string(),
-        cloud_dir: args.cloud_dir.to_string(),
+        local_name_prefix: args.local_name_prefix.to_string(),
+        remote_path: args.remote_path.to_string(),
     });
 
     config.save()?;
@@ -86,7 +86,7 @@ fn handle_config_dir_add(args: &DirectoryAddArgs) -> Result<String> {
     Ok("Directory entry added.".to_string())
 }
 
-/// Removes a directory mapping from the config's directory_struct by prefix_file.
+/// Removes a directory mapping from the config's directory_struct by local_name_prefix.
 /// Notifies the user if no such entry was found.
 fn handle_config_dir_rm(args: &DirectoryRemoveArgs) -> Result<String> {
     let mut config: Config = Config::load()?;
@@ -94,7 +94,7 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs) -> Result<String> {
     let old_len = config.directory_struct.len();
     config
         .directory_struct
-        .retain(|entry| entry.prefix_file != args.prefix_file);
+        .retain(|entry| entry.local_name_prefix != args.local_name_prefix);
 
     if config.directory_struct.len() < old_len {
         config.save()?;
@@ -102,7 +102,7 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs) -> Result<String> {
     }
 
     Err(PrefixloadError::Custom(
-        "No entry with such prefix_file found.".to_string(),
+        "No entry with such local_name_prefix found.".to_string(),
     ))
 }
 
@@ -177,8 +177,8 @@ mod tests {
         let _guard = temp_config_dir();
 
         let add_args = DirectoryAddArgs {
-            prefix_file: "PRE".into(),
-            cloud_dir: "dir1/".into(),
+            local_name_prefix: "PRE".into(),
+            remote_path: "dir1/".into(),
         };
 
         // First insertion succeeds
@@ -191,13 +191,13 @@ mod tests {
             cfg_after_first
                 .directory_struct
                 .iter()
-                .any(|e| e.prefix_file == "PRE" && e.cloud_dir == "dir1/"),
+                .any(|e| e.local_name_prefix == "PRE" && e.remote_path == "dir1/"),
             "New directory mapping not found in config"
         );
 
         // Second insertion with the same prefix should be rejected
         let err_msg = handle_config_dir_add(&add_args).unwrap_err().to_string();
-        assert!(err_msg.contains("Entry with this prefix_file already exists."));
+        assert!(err_msg.contains("Entry with this local_name_prefix already exists."));
 
         let cfg_after_second = Config::load().unwrap();
         assert_eq!(
@@ -218,26 +218,28 @@ mod tests {
 
         // Seed a mapping we can delete
         let add_args = DirectoryAddArgs {
-            prefix_file: "DEL".into(),
-            cloud_dir: "to/delete".into(),
+            local_name_prefix: "DEL".into(),
+            remote_path: "to/delete".into(),
         };
         handle_config_dir_add(&add_args).unwrap();
 
         // Remove it
         let rm_args = DirectoryRemoveArgs {
-            prefix_file: "DEL".into(),
+            local_name_prefix: "DEL".into(),
         };
         let msg1 = handle_config_dir_rm(&rm_args).expect("dir rm 1");
         assert_eq!(msg1, "Directory entry removed.");
 
         let cfg = Config::load().unwrap();
         assert!(
-            cfg.directory_struct.iter().all(|e| e.prefix_file != "DEL"),
+            cfg.directory_struct
+                .iter()
+                .all(|e| e.local_name_prefix != "DEL"),
             "Entry was not actually removed"
         );
 
         // Second attempt should say it does not exist
         let msg_err = handle_config_dir_rm(&rm_args).unwrap_err().to_string();
-        assert!(msg_err.contains("No entry with such prefix_file found."));
+        assert!(msg_err.contains("No entry with such local_name_prefix found."));
     }
 }

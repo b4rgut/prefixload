@@ -16,12 +16,11 @@ directory_struct:
   # Each entry defines a file prefix and the corresponding cloud directory in the bucket.
   # Example: A file named "prefix_1_backup_somefile.sql" will be uploaded to "name_backet/prefix_1/prefix_1_backup_somefile.sql"
 
-  - prefix_file: "prefix_1_backup" # Local files starting with this prefix
-    cloud_dir: "prefix_1" # Will be uploaded into this directory inside the bucket
+  - local_name_prefix: "prefix_1_backup" # Local files starting with this prefix
+    remote_path: "prefix_1" # Will be uploaded into this directory inside the bucket
 
-  - prefix_file: "prefix_2_backup"
-    cloud_dir: "prefix_2"
+  - local_name_prefix: "prefix_2_backup"
+    remote_path: "prefix_2"
 
-  - prefix_file: "prefix_3_backup"
-    cloud_dir: "prefix_3"
-# === END OF CONFIGURATION ===
+  - local_name_prefix: "prefix_3_backup"
+    remote_path: "prefix_3"

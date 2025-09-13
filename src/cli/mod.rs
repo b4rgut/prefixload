@@ -15,7 +15,7 @@ pub enum ConfigCommand {
     Set(ConfigSetArgs),
     /// Add an entry to the 'directory_struct' array
     DirAdd(DirectoryAddArgs),
-    /// Remove an entry from 'directory_struct' by prefix_file
+    /// Remove an entry from 'directory_struct' by local_name_prefix
     DirRm(DirectoryRemoveArgs),
 }
 
@@ -41,15 +41,15 @@ pub struct ConfigSetArgs {
 /// Adds a new directory mapping.
 #[derive(Args, Debug, PartialEq)]
 pub struct DirectoryAddArgs {
-    pub prefix_file: String,
-    pub cloud_dir: String,
+    pub local_name_prefix: String,
+    pub remote_path: String,
 }
 
 /// Arguments for the 'config directory-remove' subcommand.
-/// Removes an entry by its prefix_file.
+/// Removes an entry by its local_name_prefix.
 #[derive(Args, Debug, PartialEq)]
 pub struct DirectoryRemoveArgs {
-    pub prefix_file: String,
+    pub local_name_prefix: String,
 }
 
 /// Top-level application subcommands
