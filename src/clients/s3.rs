@@ -205,4 +205,23 @@ mod tests {
         let region = cli.inner.config().region().unwrap().as_ref();
         assert_eq!(region, "us-east-1");
     }
+
+    #[tokio::test]
+    async fn custom_region_is_set() {
+        let server = MockServer::start().await;
+        let region_name = "eu-west-1";
+
+        let cli = S3Client::new(S3ClientOptions {
+            access_key: AK.to_string(),
+            secret_key: SK.to_string(),
+            region: Some(region_name.to_string()),
+            endpoint: Some(server.uri()),
+            force_path_style: true,
+        })
+        .await
+        .expect("client init");
+
+        let region = cli.inner.config().region().unwrap().as_ref();
+        assert_eq!(region, region_name);
+    }
 }
