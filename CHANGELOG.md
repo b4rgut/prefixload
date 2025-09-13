@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/b4rgut/prefixload/compare/v0.9.0...v0.10.0) - 2025-09-13
+
+### Added
+
+- *(clients/s3)* accept any string type in S3ClientOptions builder
+
+### Fixed
+
+- *(clients/s3)* simplify S3 region configuration handling
+
+### Other
+
+- *(clients/s3)* add test for custom S3 region setting
+- *(clients/s3)* add documentation to S3ClientOptions builder methods
+- *(clients/s3)* remove comment for credentials lookup
+- *(cli/commands/config)* add helper function to simplify config file
+
 ## [0.9.0](https://github.com/b4rgut/prefixload/compare/v0.8.1...v0.9.0) - 2025-09-13
 
 ### Fixed
