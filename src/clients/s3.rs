@@ -39,23 +39,23 @@ impl Default for S3ClientOptions {
 }
 
 impl S3ClientOptions {
-    pub fn with_access_key(mut self, access_key: String) -> Self {
-        self.access_key = access_key;
+    pub fn with_access_key<S: Into<String>>(mut self, access_key: S) -> Self {
+        self.access_key = access_key.into();
         self
     }
 
-    pub fn with_secret_key(mut self, secret_key: String) -> Self {
-        self.secret_key = secret_key;
+    pub fn with_secret_key<S: Into<String>>(mut self, secret_key: S) -> Self {
+        self.secret_key = secret_key.into();
         self
     }
 
-    pub fn with_region(mut self, region: String) -> Self {
-        self.region = Some(region);
+    pub fn with_region<S: Into<String>>(mut self, region: S) -> Self {
+        self.region = Some(region.into());
         self
     }
 
-    pub fn with_endpoint(mut self, endpoint: String) -> Self {
-        self.endpoint = Some(endpoint);
+    pub fn with_endpoint<S: Into<String>>(mut self, endpoint: S) -> Self {
+        self.endpoint = Some(endpoint.into());
         self
     }
 
