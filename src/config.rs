@@ -23,7 +23,7 @@ pub struct Config {
     pub endpoint: String,
     pub bucket: String,
     pub part_size: u64,
-    pub local_directory_path: String,
+    pub local_directory_path: PathBuf,
     pub directory_struct: Vec<DirectoryEntry>,
 }
 

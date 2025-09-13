@@ -53,7 +53,7 @@ fn handle_config_set(args: &ConfigSetArgs) -> Result<String> {
         config.part_size = *val;
     }
     if let Some(val) = &args.local_directory_path {
-        config.local_directory_path = val.to_string();
+        config.local_directory_path = val.clone();
     }
 
     config.save()?;
@@ -124,6 +124,7 @@ mod tests {
     use super::*;
     use serial_test::serial;
     use std::env;
+    use std::path::PathBuf;
     use tempfile::TempDir;
 
     // Environment variable that `dirs_next::config_dir()` consults
@@ -164,7 +165,7 @@ mod tests {
         assert_eq!(cfg.endpoint, "http://example.com");
         assert_eq!(cfg.bucket, "mybucket");
         assert_eq!(cfg.part_size, 123);
-        assert_eq!(cfg.local_directory_path, "/tmp/data");
+        assert_eq!(cfg.local_directory_path, PathBuf::from("/tmp/data"));
     }
 
     // ---------------------------------------------------------------------

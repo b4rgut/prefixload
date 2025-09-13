@@ -2,6 +2,7 @@ pub mod commands;
 
 use crate::error::Result;
 use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 
 /// Nested subcommands for the `config` command.
 /// Allows you to show, edit, and modify specific config fields.
@@ -34,7 +35,7 @@ pub struct ConfigSetArgs {
     pub part_size: Option<u64>,
     /// Local directory path to scan for files
     #[arg(long)]
-    pub local_directory_path: Option<String>,
+    pub local_directory_path: Option<PathBuf>,
 }
 
 /// Arguments for the 'config directory-add' subcommand.
