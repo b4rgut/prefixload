@@ -26,7 +26,7 @@ pub struct ConfigSetArgs {
     #[arg(long)]
     pub endpoint: Option<String>,
     #[arg(long)]
-    pub backet: Option<String>,
+    pub bucket: Option<String>,
     #[arg(long)]
     pub part_size: Option<u64>,
     #[arg(long)]

@@ -46,7 +46,7 @@ fn handle_config_set(args: &ConfigSetArgs) -> Result<String> {
     if let Some(val) = &args.endpoint {
         config.endpoint = val.to_string();
     }
-    if let Some(val) = &args.backet {
+    if let Some(val) = &args.bucket {
         config.bucket = val.to_string();
     }
     if let Some(val) = &args.part_size {
@@ -152,7 +152,7 @@ mod tests {
 
         let args = ConfigSetArgs {
             endpoint: Some("http://example.com".into()),
-            backet: Some("mybucket".into()), // NB: field name in CLI struct
+            bucket: Some("mybucket".into()), // NB: field name in CLI struct
             part_size: Some(123),
             local_directory_path: Some("/tmp/data".into()),
         };
