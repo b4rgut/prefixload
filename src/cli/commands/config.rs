@@ -33,8 +33,7 @@ fn handle_config_show() -> Result<String> {
 /// Opens the config file in the user's preferred editor.
 /// Tries $EDITOR env var, or falls back to the platform default.
 fn handle_config_edit() -> Result<String> {
-    let _ = Config::edit();
-
+    Config::edit()?;
     Ok("".to_string())
 }
 
