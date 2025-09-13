@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0](https://github.com/b4rgut/prefixload/compare/v0.8.1...v0.9.0) - 2025-09-13
+
+### Fixed
+
+- propagate config edit errors properly
+- correct bucket field name and update config assignment
+
+### Other
+
+- src/config.rs
+- extract config update logic into reusable function
+- simplify config command handling by removing unnecessary Ok()
+- change local_directory_path type from String to PathBuf
+- [**breaking**] rename DirectoryEntry fields for clarity
+- add field descriptions to ConfigSetArgs struct
+
 ## [0.8.1](https://github.com/b4rgut/prefixload/compare/v0.8.0...v0.8.1) - 2025-09-08
 
 ### Other
