@@ -38,27 +38,35 @@ impl Default for S3ClientOptions {
     }
 }
 
+/// Builder methods for `S3ClientOptions`.
 impl S3ClientOptions {
+    /// Sets the access key.
     pub fn with_access_key<S: Into<String>>(mut self, access_key: S) -> Self {
         self.access_key = access_key.into();
         self
     }
 
+    /// Sets the secret key.
     pub fn with_secret_key<S: Into<String>>(mut self, secret_key: S) -> Self {
         self.secret_key = secret_key.into();
         self
     }
 
+    /// Sets the AWS region.
     pub fn with_region<S: Into<String>>(mut self, region: S) -> Self {
         self.region = Some(region.into());
         self
     }
 
+    /// Sets a custom S3 endpoint URL.
+    /// Useful for S3-compatible services like MinIO or Ceph.
     pub fn with_endpoint<S: Into<String>>(mut self, endpoint: S) -> Self {
         self.endpoint = Some(endpoint.into());
         self
     }
 
+    /// Enables or disables force path-style addressing.
+    /// Required for services that do not support virtual-hosted-style requests.
     pub fn with_force_path_style(mut self, force_path_style: bool) -> Self {
         self.force_path_style = force_path_style;
         self
