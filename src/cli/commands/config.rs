@@ -111,11 +111,11 @@ fn handle_config_dir_rm(args: &DirectoryRemoveArgs) -> Result<String> {
 /// Returns an empty string as a placeholder output.
 pub async fn run(cmd: ConfigCommand) -> Result<String> {
     match cmd {
-        ConfigCommand::Show => Ok(handle_config_show()?),
-        ConfigCommand::Edit => Ok(handle_config_edit()?),
-        ConfigCommand::Set(args) => Ok(handle_config_set(&args)?),
-        ConfigCommand::DirAdd(args) => Ok(handle_config_dir_add(&args)?),
-        ConfigCommand::DirRm(args) => Ok(handle_config_dir_rm(&args)?),
+        ConfigCommand::Show => handle_config_show(),
+        ConfigCommand::Edit => handle_config_edit(),
+        ConfigCommand::Set(args) => handle_config_set(&args),
+        ConfigCommand::DirAdd(args) => handle_config_dir_add(&args),
+        ConfigCommand::DirRm(args) => handle_config_dir_rm(&args),
     }
 }
 
