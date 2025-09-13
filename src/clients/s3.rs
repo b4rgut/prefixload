@@ -69,7 +69,6 @@ impl S3Client {
     /// Creates a new client capable of working with both AWS
     /// and any S3-compatible service.
     pub async fn new(opts: S3ClientOptions) -> Result<Self> {
-        /* ---------- учёт учётных данных ---------- */
         let credentials = Credentials::new(
             opts.access_key,
             opts.secret_key,
