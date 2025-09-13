@@ -38,72 +38,74 @@ fn handle_config_edit() -> Result<String> {
     Ok("".to_string())
 }
 
+fn update_config<F, R>(operation: F) -> Result<R>
+where
+    F: FnOnce(&mut Config) -> Result<R>,
+{
+    let mut config = Config::load()?;
+    let result = operation(&mut config)?;
+    config.save()?;
+    Ok(result)
+}
+
 /// Updates one or more top-level config fields (endpoint, backet, part_size, local_directory_path).
 /// Only updates fields provided as Some(value).
 fn handle_config_set(args: &ConfigSetArgs) -> Result<String> {
-    let mut config: Config = Config::load()?;
-
-    if let Some(val) = &args.endpoint {
-        config.endpoint = val.to_string();
-    }
-    if let Some(val) = &args.bucket {
-        config.bucket = val.to_string();
-    }
-    if let Some(val) = &args.part_size {
-        config.part_size = *val;
-    }
-    if let Some(val) = &args.local_directory_path {
-        config.local_directory_path = val.clone();
-    }
-
-    config.save()?;
-
-    Ok("Config updated!".to_string())
+    update_config(|config| {
+        if let Some(val) = &args.endpoint {
+            config.endpoint = val.clone();
+        }
+        if let Some(val) = &args.bucket {
+            config.bucket = val.clone();
+        }
+        if let Some(val) = args.part_size {
+            config.part_size = val;
+        }
+        if let Some(val) = &args.local_directory_path {
+            config.local_directory_path = val.clone();
+        }
+        Ok("Config updated!".to_string())
+    })
 }
 
 /// Adds a new directory mapping to the config's directory_struct.
 /// Skips addition if the local_name_prefix already exists.
 fn handle_config_dir_add(args: &DirectoryAddArgs) -> Result<String> {
-    let mut config: Config = Config::load()?;
-
-    if config
-        .directory_struct
-        .iter()
-        .any(|entry| entry.local_name_prefix == args.local_name_prefix)
-    {
-        return Err(PrefixloadError::Custom(
-            "Entry with this local_name_prefix already exists.".to_string(),
-        ));
-    }
-
-    config.directory_struct.push(DirectoryEntry {
-        local_name_prefix: args.local_name_prefix.to_string(),
-        remote_path: args.remote_path.to_string(),
-    });
-
-    config.save()?;
-
-    Ok("Directory entry added.".to_string())
+    update_config(|config| {
+        if config
+            .directory_struct
+            .iter()
+            .any(|e| e.local_name_prefix == args.local_name_prefix)
+        {
+            return Err(PrefixloadError::Custom(
+                "Entry with this local_name_prefix already exists.".to_string(),
+            ));
+        }
+        config.directory_struct.push(DirectoryEntry {
+            local_name_prefix: args.local_name_prefix.clone(),
+            remote_path: args.remote_path.clone(),
+        });
+        Ok("Directory entry added.".to_string())
+    })
 }
 
 /// Removes a directory mapping from the config's directory_struct by local_name_prefix.
 /// Notifies the user if no such entry was found.
 fn handle_config_dir_rm(args: &DirectoryRemoveArgs) -> Result<String> {
-    let mut config: Config = Config::load()?;
+    update_config(|config| {
+        let old_len = config.directory_struct.len();
+        config
+            .directory_struct
+            .retain(|entry| entry.local_name_prefix != args.local_name_prefix);
 
-    let old_len = config.directory_struct.len();
-    config
-        .directory_struct
-        .retain(|entry| entry.local_name_prefix != args.local_name_prefix);
+        if config.directory_struct.len() < old_len {
+            return Ok("Directory entry removed.".to_string());
+        }
 
-    if config.directory_struct.len() < old_len {
-        config.save()?;
-        return Ok("Directory entry removed.".to_string());
-    }
-
-    Err(PrefixloadError::Custom(
-        "No entry with such local_name_prefix found.".to_string(),
-    ))
+        Err(PrefixloadError::Custom(
+            "No entry with such local_name_prefix found.".to_string(),
+        ))
+    })
 }
 
 /// Handles all config subcommands.
