@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{PrefixloadError, Result};
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -91,10 +91,7 @@ impl Config {
     pub fn read_to_string() -> Result<String> {
         let path = Self::config_path().unwrap();
         Self::ensure_config_exists(&path)?;
-
-        let content = fs::read_to_string(&path)?;
-
-        Ok(content)
+        Ok(fs::read_to_string(&path)?)
     }
 
     /// Loads the configuration from disk and deserialises it into a
@@ -102,11 +99,7 @@ impl Config {
     ///
     /// Fails if YAML is syntactically invalid or cannot be read.
     pub fn load() -> Result<Self> {
-        let path = Self::config_path().unwrap();
-        Self::ensure_config_exists(&path)?;
-
-        let s = fs::read_to_string(&path)?;
-
+        let s = Self::read_to_string()?;
         Ok(serde_yaml::from_str(&s)?)
     }
 
@@ -129,12 +122,17 @@ impl Config {
     ///
     /// Before editing a **backup** is created as `config.yml.bak`.
     pub fn edit() -> Result<()> {
-        let path = Self::config_path().unwrap();
+        let path = Self::config_path()?;
         Self::backup_config()?;
 
         // Try $EDITOR, otherwise platform default
         let editor = std::env::var("EDITOR").unwrap_or_else(|_| default_editor());
-        std::process::Command::new(editor).arg(path).status()?;
+        std::process::Command::new(&editor)
+            .arg(&path)
+            .status()
+            .map_err(|e| {
+                PrefixloadError::Custom(format!("Failed to launch editor '{}': {}", editor, e))
+            })?;
 
         Ok(())
     }
