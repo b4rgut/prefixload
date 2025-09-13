@@ -82,11 +82,9 @@ impl S3Client {
         let mut cfg_loader = aws_config::defaults(aws_config::BehaviorVersion::latest())
             .credentials_provider(cred_provider);
 
-        let region = opts
-            .region // Option<&str>
-            .unwrap_or("us-east-1".to_string()); // default
+        let region = opts.region.unwrap_or_else(|| "us-east-1".to_string());
 
-        cfg_loader = cfg_loader.region(Region::new(region.to_owned()));
+        cfg_loader = cfg_loader.region(Region::new(region));
 
         let shared_cfg = cfg_loader.load().await;
 
