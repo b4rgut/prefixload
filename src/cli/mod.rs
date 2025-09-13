@@ -23,12 +23,16 @@ pub enum ConfigCommand {
 /// Each field corresponds to a top-level config property.
 #[derive(Args, Debug, PartialEq)]
 pub struct ConfigSetArgs {
+    /// S3 endpoint URL (e.g., https://s3.amazonaws.com)
     #[arg(long)]
     pub endpoint: Option<String>,
+    /// S3 bucket name to use for backups
     #[arg(long)]
     pub bucket: Option<String>,
+    /// Size of each upload part in bytes (default: 5MB)
     #[arg(long)]
     pub part_size: Option<u64>,
+    /// Local directory path to scan for files
     #[arg(long)]
     pub local_directory_path: Option<String>,
 }
