@@ -48,7 +48,8 @@ impl Config {
     /// - Linux/macOS: ~/.config/prefixload/config.yml
     /// - Windows: %APPDATA%\prefixload\config.yml
     fn config_path() -> Result<PathBuf> {
-        let mut dir = dirs_next::config_dir().expect("Failed to get config directory");
+        let mut dir = dirs_next::config_dir()
+            .ok_or_else(|| PrefixloadError::Custom("Failed to get config directory".into()))?;
 
         dir.push("prefixload");
         fs::create_dir_all(&dir)?;
@@ -63,7 +64,7 @@ impl Config {
     fn ensure_config_exists(path: &PathBuf) -> Result<()> {
         if !path.exists() {
             let bytes = Asset::get("config.yml")
-                .expect("Embedded config.yaml not found")
+                .expect("Embedded config.yml not found")
                 .data;
             std::fs::write(path, bytes)?;
             println!("Default config.yml written to {}", path.display());
@@ -73,7 +74,7 @@ impl Config {
 
     /// Creates or updates a backup of the config file as `config.yml.bak` before making changes.
     fn backup_config() -> Result<()> {
-        let path = Self::config_path().unwrap();
+        let path = Self::config_path()?;
 
         if path.exists() {
             let mut backup_path = path.clone();
@@ -91,7 +92,7 @@ impl Config {
     /// * The file exists (creates from embedded default if necessary).
     /// * Parent directory is created on-demand.
     pub fn read_to_string() -> Result<String> {
-        let path = Self::config_path().unwrap();
+        let path = Self::config_path()?;
         Self::ensure_config_exists(&path)?;
         Ok(fs::read_to_string(&path)?)
     }
@@ -110,7 +111,7 @@ impl Config {
     /// *Creates/updates* `config.yml.bak` before overwriting the primary file
     /// to guard against accidental data loss.
     pub fn save(&self) -> Result<()> {
-        let path = Self::config_path().unwrap();
+        let path = Self::config_path()?;
         Self::backup_config()?;
 
         let s = serde_yaml::to_string(self)?;
@@ -184,7 +185,7 @@ mod tests {
     #[serial]
     fn ensure_config_creates_default_file() {
         let _guard = temp_config_dir();
-        let path = Config::config_path().unwrap();
+        let path = Config::config_path().expect("config path");
 
         // 1) file should not exist yet
         assert!(!path.exists());
@@ -228,7 +229,7 @@ mod tests {
 
         // start with default
         let mut cfg = Config::load().unwrap();
-        let path = Config::config_path().unwrap();
+        let path = Config::config_path().expect("config path");
         let old = fs::read_to_string(&path).unwrap();
 
         // change a field and save
