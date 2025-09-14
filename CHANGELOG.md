@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/b4rgut/prefixload/compare/v0.10.0...v0.11.0) - 2025-09-14
+
+### Added
+
+- *(s3)* add S3 region and path style configuration options
+
+### Fixed
+
+- *(s3)* S3 bucket access check and improve tests
+
+### Other
+
+- *(S3)* add S3 auth header check to bucket access test
+
 ## [0.10.0](https://github.com/b4rgut/prefixload/compare/v0.9.0...v0.10.0) - 2025-09-13
 
 ### Added
