@@ -2,7 +2,6 @@ use crate::error::Result;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::config::Credentials;
-use aws_sdk_s3::error::ProvideErrorMetadata;
 use aws_types::region::Region;
 
 #[derive(Debug, Clone)]
@@ -116,18 +115,22 @@ impl S3Client {
     /// - `Ok(false)` – the key is valid, but there are no rights (401/403)
     /// - `Err(e)`    – other errors (network, DNS, incorrect region, etc.)
     pub async fn check_bucket_access(&self, bucket: &str) -> Result<bool> {
-        match self.inner.head_bucket().bucket(bucket).send().await {
-            // 200 OK – the bucket exists and the credentials are valid
+        let result = self.inner.head_bucket().bucket(bucket).send().await;
+        match result {
             Ok(_) => Ok(true),
-
             Err(sdk_err) => {
-                // 403 Forbidden or 401 Unauthorized ⇢ the bucket is there, but there are no rights
-                if matches!(sdk_err.code(), Some("AccessDenied") | Some("Forbidden")) {
-                    return Ok(false);
+                // For HeadBucket, 403/401 indicates that the bucket exists, but we don't have access.
+                // The error code might not be populated correctly in all cases,
+                // so we check the raw status code.
+                if let Some(response) = sdk_err.raw_response() {
+                    let status = response.status();
+                    if status.as_u16() == 403 || status.as_u16() == 401 {
+                        return Ok(false);
+                    }
                 }
 
-                // Everything else (404 NotFound, PermanentRedirect, network failures, etc.)
-                // wrap it in our Error tree and throw it up.
+                // If we couldn't get the raw response, or for any other error,
+                // convert to our error type and propagate.
                 let aws_err: aws_sdk_s3::Error = sdk_err.into();
                 Err(aws_err.into())
             }
@@ -138,7 +141,7 @@ impl S3Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{method, path_regex};
+    use wiremock::matchers::{header, method, path_regex};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     const AK: &str = "TEST_AK";
@@ -178,13 +181,59 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn access_denied_returns_false() {
+        let server = MockServer::start().await;
+        let bucket = "forbidden-bucket";
+
+        let response = ResponseTemplate::new(403);
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(r"^/forbidden-bucket(/)?$"))
+            .respond_with(response)
+            .mount(&server)
+            .await;
+
+        let ok = client(&server)
+            .await
+            .check_bucket_access(bucket)
+            .await
+            .expect("should be Ok(false)");
+
+        assert!(!ok);
+    }
+
+    #[tokio::test]
+    async fn unauthorized_returns_false() {
+        let server = MockServer::start().await;
+        let bucket = "unauthorized-bucket";
+
+        let response = ResponseTemplate::new(401);
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(r"^/unauthorized-bucket(/)?$"))
+            .respond_with(response)
+            .mount(&server)
+            .await;
+
+        let ok = client(&server)
+            .await
+            .check_bucket_access(bucket)
+            .await
+            .expect("should be Ok(false)");
+
+        assert!(!ok);
+    }
+
+    #[tokio::test]
     async fn not_found_propagates_error() {
         let server = MockServer::start().await;
         let bucket = "missing";
 
+        let response = ResponseTemplate::new(404);
+
         Mock::given(method("HEAD"))
             .and(path_regex(r"^/missing(/)?$"))
-            .respond_with(ResponseTemplate::new(404))
+            .respond_with(response)
             .mount(&server)
             .await;
 
@@ -194,7 +243,6 @@ mod tests {
             .await
             .expect_err("should be Err");
 
-        // basic sanity: make sure original S3 error code preserved
         assert!(format!("{err:?}").contains("NotFound"));
     }
 
@@ -224,5 +272,81 @@ mod tests {
 
         let region = cli.inner.config().region().unwrap().as_ref();
         assert_eq!(region, region_name);
+    }
+
+    #[tokio::test]
+    async fn force_path_style_is_honored() {
+        let server = MockServer::start().await;
+        let bucket = "mybucket";
+
+        // Mock for path-style request (e.g. http://localhost:1234/mybucket)
+        Mock::given(method("HEAD"))
+            .and(path_regex(r"^/mybucket(/)?$"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        // Mock for virtual-hosted-style request (e.g. http://mybucket.localhost:1234)
+        let server_host = server.uri().replace("http://", "");
+        let expected_host = format!("{}.{}", bucket, server_host);
+        Mock::given(method("HEAD"))
+            .and(header("Host", expected_host.as_str()))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        // 1. Test with force_path_style = true
+        let cli_path_style = S3Client::new(S3ClientOptions {
+            access_key: AK.to_string(),
+            secret_key: SK.to_string(),
+            region: Some("us-east-1".to_string()),
+            endpoint: Some(server.uri()),
+            force_path_style: true,
+        })
+        .await
+        .expect("client init with path style");
+
+        // This should hit the path-style mock and succeed
+        assert!(cli_path_style.check_bucket_access(bucket).await.is_ok());
+
+        // 2. Test with force_path_style = false
+        let cli_virtual_hosted = S3Client::new(S3ClientOptions {
+            access_key: AK.to_string(),
+            secret_key: SK.to_string(),
+            region: Some("us-east-1".to_string()),
+            endpoint: Some(server.uri()),
+            force_path_style: false,
+        })
+        .await
+        .expect("client init with virtual-hosted style");
+
+        // This should hit the virtual-hosted-style mock and succeed
+        assert!(cli_virtual_hosted.check_bucket_access(bucket).await.is_ok());
+    }
+
+    #[test]
+    fn options_builder_works() {
+        let opts = S3ClientOptions::default()
+            .with_access_key("ak")
+            .with_secret_key("sk")
+            .with_region("eu-central-1")
+            .with_endpoint("http://localhost:9000")
+            .with_force_path_style(true);
+
+        assert_eq!(opts.access_key, "ak");
+        assert_eq!(opts.secret_key, "sk");
+        assert_eq!(opts.region, Some("eu-central-1".to_string()));
+        assert_eq!(opts.endpoint, Some("http://localhost:9000".to_string()));
+        assert!(opts.force_path_style);
+    }
+
+    #[test]
+    fn options_default_is_empty() {
+        let opts = S3ClientOptions::default();
+        assert_eq!(opts.access_key, "");
+        assert_eq!(opts.secret_key, "");
+        assert_eq!(opts.region, None);
+        assert_eq!(opts.endpoint, None);
+        assert!(!opts.force_path_style);
     }
 }
