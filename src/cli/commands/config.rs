@@ -7,27 +7,33 @@ use syntect::parsing::SyntaxSet;
 use syntect::util::{LinesWithEndings, as_24_bit_terminal_escaped};
 
 /// Prints the current YAML config file contents to stdout with syntax highlighting.
+/// Falls back to plain text if the syntax highlighting theme is not found.
 fn handle_config_show() -> Result<String> {
     let content = Config::read_to_string()?;
 
-    let ps = SyntaxSet::load_defaults_newlines();
     let ts = ThemeSet::load_defaults();
-    let syntax = ps
-        .find_syntax_by_extension("yml")
-        .or_else(|| ps.find_syntax_by_extension("yaml"))
-        .unwrap_or_else(|| ps.find_syntax_plain_text());
 
-    let theme = &ts.themes["base16-ocean.dark"];
-    let mut h = HighlightLines::new(syntax, theme);
-    let mut buf = String::with_capacity(content.len() * 2);
+    // Try to get the theme; if it's not found, just return the raw content.
+    if let Some(theme) = ts.themes.get("base16-ocean.dark") {
+        let ps = SyntaxSet::load_defaults_newlines();
+        let syntax = ps
+            .find_syntax_by_extension("yml")
+            .or_else(|| ps.find_syntax_by_extension("yaml"))
+            .unwrap_or_else(|| ps.find_syntax_plain_text());
 
-    for line in LinesWithEndings::from(&content) {
-        let ranges = h.highlight_line(line, &ps)?;
-        let escaped = as_24_bit_terminal_escaped(&ranges[..], false);
-        buf.push_str(&escaped);
+        let mut h = HighlightLines::new(syntax, theme);
+        let mut buf = String::with_capacity(content.len() * 2);
+
+        for line in LinesWithEndings::from(&content) {
+            let ranges = h.highlight_line(line, &ps)?;
+            let escaped = as_24_bit_terminal_escaped(&ranges[..], false);
+            buf.push_str(&escaped);
+        }
+        Ok(buf)
+    } else {
+        // Fallback to plain text if theme is missing
+        Ok(content)
     }
-
-    Ok(buf)
 }
 
 /// Opens the config file in the user's preferred editor.
@@ -156,6 +162,27 @@ mod tests {
         // `set_var` became unsafe in recent toolchains
         unsafe { env::set_var(CONFIG_ENV, tmp.path()) };
         tmp
+    }
+
+    // ---------------------------------------------------------------------
+    // handle_config_show
+    // ---------------------------------------------------------------------
+
+    #[test]
+    #[serial]
+    fn config_show_returns_content() {
+        let _guard = temp_config_dir();
+
+        let result = handle_config_show().expect("handle_config_show should not fail");
+
+        // DEBUG: Print the result to see what the test is getting.
+        println!("Test result content: '{}'", &result);
+
+        // Check that the result (with or without backlight) contains the keywords
+        // lines from the source file. This confirms that the file has been read.
+        assert!(result.contains("endpoint"));
+        assert!(result.contains("bucket"));
+        assert!(result.contains("directory_struct"));
     }
 
     // ---------------------------------------------------------------------
