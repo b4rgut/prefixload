@@ -30,6 +30,12 @@ pub struct ConfigSetArgs {
     /// S3 bucket name to use for backups
     #[arg(long)]
     pub bucket: Option<String>,
+    /// The AWS region to use
+    #[arg(long)]
+    pub region: Option<String>,
+    /// Force path-style addressing (for MinIO, etc.)
+    #[arg(long)]
+    pub force_path_style: Option<bool>,
     /// Size of each upload part in bytes (default: 5MB)
     #[arg(long)]
     pub part_size: Option<u64>,

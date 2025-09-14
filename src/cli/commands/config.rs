@@ -66,6 +66,12 @@ fn handle_config_set(args: &ConfigSetArgs) -> Result<String> {
         if let Some(val) = &args.bucket {
             config.bucket = val.clone();
         }
+        if let Some(val) = &args.region {
+            config.region = val.clone();
+        }
+        if let Some(val) = args.force_path_style {
+            config.force_path_style = val;
+        }
         if let Some(val) = args.part_size {
             config.part_size = val;
         }
@@ -164,6 +170,8 @@ mod tests {
         let args = ConfigSetArgs {
             endpoint: Some("http://example.com".into()),
             bucket: Some("mybucket".into()), // NB: field name in CLI struct
+            region: Some("eu-central-1".into()),
+            force_path_style: Some(true),
             part_size: Some(123),
             local_directory_path: Some("/tmp/data".into()),
         };
@@ -174,6 +182,8 @@ mod tests {
         let cfg = Config::load().unwrap();
         assert_eq!(cfg.endpoint, "http://example.com");
         assert_eq!(cfg.bucket, "mybucket");
+        assert_eq!(cfg.region, "eu-central-1");
+        assert_eq!(cfg.force_path_style, true);
         assert_eq!(cfg.part_size, 123);
         assert_eq!(cfg.local_directory_path, PathBuf::from("/tmp/data"));
     }

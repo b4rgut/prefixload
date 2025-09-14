@@ -99,10 +99,11 @@ impl S3Client {
         let mut s3_cfg = S3ConfigBuilder::from(&shared_cfg);
 
         if let Some(url) = opts.endpoint {
-            s3_cfg = s3_cfg
-                .endpoint_url(url)
-                .force_path_style(opts.force_path_style);
+            s3_cfg = s3_cfg.endpoint_url(url);
         }
+
+        // Always apply force_path_style from options, regardless of endpoint
+        s3_cfg = s3_cfg.force_path_style(opts.force_path_style);
 
         let client = s3::Client::from_conf(s3_cfg.build());
 

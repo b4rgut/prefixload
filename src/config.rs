@@ -22,6 +22,8 @@ pub struct DirectoryEntry {
 pub struct Config {
     pub endpoint: String,
     pub bucket: String,
+    pub region: String,
+    pub force_path_style: bool,
     pub part_size: u64,
     pub local_directory_path: PathBuf,
     pub directory_struct: Vec<DirectoryEntry>,
