@@ -167,7 +167,7 @@ mod tests {
     #[serial] // prevents other tests from mutating env in parallel
     fn config_path_creates_directory() {
         let _guard = temp_config_dir();
-        let path = Config::config_path().expect("config path");
+        let path = Config::config_path().unwrap();
 
         assert!(
             path.ends_with("prefixload/config.yml"),
@@ -185,7 +185,7 @@ mod tests {
     #[serial]
     fn ensure_config_creates_default_file() {
         let _guard = temp_config_dir();
-        let path = Config::config_path().expect("config path");
+        let path = Config::config_path().unwrap();
 
         // 1) file should not exist yet
         assert!(!path.exists());
@@ -208,7 +208,7 @@ mod tests {
     #[serial]
     fn load_parses_yaml() {
         let _guard = temp_config_dir();
-        let cfg = Config::load().expect("load config");
+        let cfg = Config::load().unwrap();
 
         assert!(
             !cfg.endpoint.is_empty(),
@@ -250,5 +250,20 @@ mod tests {
             saved.endpoint, "http://example.com",
             "`save` did not write new endpoint value"
         );
+    }
+
+    /// Ensures `load` fails when the configuration file contains invalid YAML.
+    #[test]
+    #[serial]
+    fn load_fails_on_invalid_yaml() {
+        let _guard = temp_config_dir();
+        let path = Config::config_path().unwrap();
+
+        // write invalid YAML to the file
+        fs::write(&path, "endpoint: not-a-real-endpoint\nbucket: :").unwrap();
+
+        // loading should fail
+        let result = Config::load();
+        assert!(result.is_err(), "load() should fail on invalid YAML");
     }
 }
