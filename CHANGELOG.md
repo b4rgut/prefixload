@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1](https://github.com/b4rgut/prefixload/compare/v0.11.0...v0.11.1) - 2025-09-14
+
+### Added
+
+- *(cli/commands/login)* improve error handling in login credentials
+- *(cli/commands/config)* add fallback when syntax highlighting theme
+
+### Fixed
+
+- *(config)* unpredictable behavior related to I/O capture in tests
+- *(config)* error handling in config file operations
+
+### Other
+
+- *(config)* add test for invalid YAML config loading
+
 ## [0.11.0](https://github.com/b4rgut/prefixload/compare/v0.10.0...v0.11.0) - 2025-09-14
 
 ### Added
