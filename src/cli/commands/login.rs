@@ -15,17 +15,18 @@ fn input_credentials() -> Result<(String, String)> {
 
     let access_key = requestty::prompt_one(access_question)?
         .as_string()
-        .unwrap()
-        .to_owned();
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| PrefixloadError::Custom("Failed to parse access key.".to_string()))?;
+
     let secret_key = requestty::prompt_one(secret_question)?
         .as_string()
-        .unwrap()
-        .to_owned();
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| PrefixloadError::Custom("Failed to parse secret key.".to_string()))?;
 
     Ok((access_key, secret_key))
 }
 
-async fn credentials_valid(access_key: &str, secret_key: &str) -> Result<bool> {
+async fn credentials_valid(access_key: &str, secret_key: &str) -> Result<()> {
     let config: Config = Config::load()?;
 
     let s3_options = S3ClientOptions::default()
@@ -33,11 +34,11 @@ async fn credentials_valid(access_key: &str, secret_key: &str) -> Result<bool> {
         .with_secret_key(secret_key.to_string())
         .with_endpoint(config.endpoint.clone());
 
-    let s3_client = S3Client::new(s3_options).await.unwrap();
+    let s3_client = S3Client::new(s3_options).await?;
 
-    let result = s3_client.check_bucket_access(&config.bucket).await;
+    s3_client.check_bucket_access(&config.bucket).await?;
 
-    Ok(result.is_ok())
+    Ok(())
 }
 
 fn store_credentials(access_key: &str, secret_key: &str) -> Result<()> {
@@ -51,10 +52,14 @@ fn store_credentials(access_key: &str, secret_key: &str) -> Result<()> {
 pub async fn run() -> Result<String> {
     let (access_key, secret_key) = input_credentials()?;
 
-    if credentials_valid(&access_key, &secret_key).await? {
-        store_credentials(&access_key, &secret_key)?;
-        return Ok("Credentials have been saved successfully!".to_string());
+    match credentials_valid(&access_key, &secret_key).await {
+        Ok(()) => {
+            store_credentials(&access_key, &secret_key)?;
+            Ok("Credentials have been saved successfully!".to_string())
+        }
+        Err(err) => Err(PrefixloadError::Custom(format!(
+            "Credentials not valid: {}",
+            err
+        ))),
     }
-
-    Err(PrefixloadError::Custom("Credentials not valid".to_string()))
 }
