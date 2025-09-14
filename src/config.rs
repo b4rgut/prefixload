@@ -67,7 +67,6 @@ impl Config {
                 .expect("Embedded config.yml not found")
                 .data;
             std::fs::write(path, bytes)?;
-            println!("Default config.yml written to {}", path.display());
         }
         Ok(())
     }
