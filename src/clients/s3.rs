@@ -141,7 +141,7 @@ impl S3Client {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{header, method, path_regex};
+    use wiremock::matchers::{header, header_exists, method, path_regex};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     const AK: &str = "TEST_AK";
@@ -167,17 +167,15 @@ mod tests {
 
         Mock::given(method("HEAD"))
             .and(path_regex(r"^/mybucket(/)?$")) // ← tolerate optional '/'
+            .and(header_exists("authorization"))
             .respond_with(ResponseTemplate::new(200))
             .mount(&server)
             .await;
 
-        let ok = client(&server)
-            .await
-            .check_bucket_access(bucket)
-            .await
-            .unwrap(); // should be Ok(true)
+        let result = client(&server).await.check_bucket_access(bucket).await;
 
-        assert!(ok);
+        assert!(result.is_ok());
+        assert!(result.unwrap());
     }
 
     #[tokio::test]
