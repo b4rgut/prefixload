@@ -142,3 +142,51 @@ pub async fn run() -> Result<String> {
         ))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    #[serial]
+    fn test_save_credentials_to_file() {
+        let dir = tempdir().unwrap();
+        // By setting the HOME environment variable, we can control where `dirs_next::home_dir()` looks.
+        // This allows us to use a temporary directory for our test credentials file.
+        unsafe {
+            std::env::set_var("HOME", dir.path());
+        }
+
+        let access_key = "test_access_key";
+        let secret_key = "test_secret_key";
+
+        // Execute the function to save credentials
+        let result = save_credentials_to_file(access_key, secret_key);
+        assert!(result.is_ok());
+
+        // Verify the credentials file was created and has the correct content
+        let credentials_path = dir.path().join(".aws").join("credentials");
+        assert!(credentials_path.exists());
+
+        let content = fs::read_to_string(&credentials_path).unwrap();
+
+        assert!(content.contains(&format!("aws_access_key_id={}", access_key)));
+        assert!(content.contains(&format!("aws_secret_access_key={}", secret_key)));
+
+        // On Unix, verify file permissions are set to 600
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = fs::metadata(&credentials_path).unwrap().permissions();
+            assert_eq!(perms.mode() & 0o777, 0o600);
+        }
+
+        // Clean up the environment variable
+        unsafe {
+            std::env::remove_var("HOME");
+        }
+    }
+}
