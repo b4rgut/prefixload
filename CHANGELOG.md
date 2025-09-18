@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3](https://github.com/b4rgut/prefixload/compare/v0.11.2...v0.11.3) - 2025-09-18
+
+### Added
+
+- *(crypto/etag)* add parallel S3 ETag calculation for files
+
 ## [0.11.2](https://github.com/b4rgut/prefixload/compare/v0.11.1...v0.11.2) - 2025-09-18
 
 ### Added
