@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2](https://github.com/b4rgut/prefixload/compare/v0.11.1...v0.11.2) - 2025-09-18
+
+### Added
+
+- *(cli/commands/login)* add AWS credentials file handling for login
+
+### Other
+
+- *(cli/commands/login)* add test for save_credentials_to_file function
+
 ## [0.11.1](https://github.com/b4rgut/prefixload/compare/v0.11.0...v0.11.1) - 2025-09-14
 
 ### Added
