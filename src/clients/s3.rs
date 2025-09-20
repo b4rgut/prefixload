@@ -4,6 +4,8 @@ use aws_credential_types::provider::ProvideCredentials;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::config::Credentials;
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_types::region::Region;
 
 #[derive(Debug, Clone)]
@@ -164,6 +166,51 @@ impl S3Client {
                 let aws_err: aws_sdk_s3::Error = sdk_err.into();
                 Err(aws_err.into())
             }
+        }
+    }
+
+    /// Checks if the object in S3 is synced with the local file version.
+    ///
+    /// "Synced" means the object exists in the bucket and its ETag matches
+    /// the local file's MD5 hash. This is used to avoid re-uploading a file
+    /// that hasn't changed.
+    ///
+    /// # Parameters
+    /// - `local_file_md5`: The MD5 hash of the local file to compare against.
+    /// - `bucket`: The name of the S3 bucket.
+    /// - `object_name`: The name of the object in S3.
+    ///
+    /// # Returns
+    /// - `Ok(true)` if the object exists and its ETag matches `local_file_md5`.
+    /// - `Ok(false)` if the object does not exist or its ETag does not match.
+    /// - `Err` for other S3 errors.
+    pub async fn is_object_synced(
+        &self,
+        local_file_md5: &str,
+        bucket: &str,
+        object_name: &str,
+    ) -> Result<bool> {
+        match self
+            .inner
+            .head_object()
+            .bucket(bucket)
+            .key(object_name)
+            .send()
+            .await
+        {
+            Ok(output) => {
+                if let Some(etag) = output.e_tag() {
+                    let remote_md5 = etag.trim_matches('"');
+                    Ok(remote_md5 == local_file_md5)
+                } else {
+                    Ok(false)
+                }
+            }
+            Err(SdkError::ServiceError(service_error)) => match service_error.into_err() {
+                HeadObjectError::NotFound(_) => Ok(false),
+                other => Err(aws_sdk_s3::Error::from(other).into()),
+            },
+            Err(sdk_err) => Err(aws_sdk_s3::Error::from(sdk_err).into()),
         }
     }
 }
@@ -454,5 +501,109 @@ mod tests {
         unsafe {
             std::env::remove_var("HOME");
         }
+    }
+
+    #[tokio::test]
+    async fn is_object_synced_matches() {
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "test-bucket";
+        let object_name = "test-object";
+        let md5 = "d41d8cd98f00b204e9800998ecf8427e";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .respond_with(ResponseTemplate::new(200).insert_header("ETag", format!("\"{}\"", md5)))
+            .mount(&server)
+            .await;
+
+        let result = s3_client.is_object_synced(md5, bucket, object_name).await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn is_object_synced_mismatch() {
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "test-bucket";
+        let object_name = "test-object";
+        let local_md5 = "d41d8cd98f00b204e9800998ecf8427e";
+        let remote_md5 = "another-md5-hash";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .respond_with(
+                ResponseTemplate::new(200).insert_header("ETag", format!("\"{}\"", remote_md5)),
+            )
+            .mount(&server)
+            .await;
+
+        let result = s3_client
+            .is_object_synced(local_md5, bucket, object_name)
+            .await;
+
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn is_object_synced_not_found() {
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "test-bucket";
+        let object_name = "test-object";
+        let md5 = "d41d8cd98f00b204e9800998ecf8427e";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let result = s3_client.is_object_synced(md5, bucket, object_name).await;
+
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn is_object_synced_no_etag() {
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "test-bucket";
+        let object_name = "test-object";
+        let md5 = "d41d8cd98f00b204e9800998ecf8427e";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .respond_with(ResponseTemplate::new(200)) // No ETag header
+            .mount(&server)
+            .await;
+
+        let result = s3_client.is_object_synced(md5, bucket, object_name).await;
+
+        assert!(result.is_ok());
+        assert!(!result.unwrap());
+    }
+
+    #[tokio::test]
+    async fn is_object_synced_server_error() {
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "test-bucket";
+        let object_name = "test-object";
+        let md5 = "d41d8cd98f00b204e9800998ecf8427e";
+
+        Mock::given(method("HEAD"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&server)
+            .await;
+
+        let result = s3_client.is_object_synced(md5, bucket, object_name).await;
+
+        assert!(result.is_err());
     }
 }
