@@ -1,4 +1,6 @@
-use crate::error::Result;
+use crate::error::{PrefixloadError, Result};
+use aws_config::profile::ProfileFileCredentialsProvider;
+use aws_credential_types::provider::ProvideCredentials;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::config::Credentials;
@@ -39,6 +41,34 @@ impl Default for S3ClientOptions {
 
 /// Builder methods for `S3ClientOptions`.
 impl S3ClientOptions {
+    /// Loads AWS credentials (access key and secret key) from the standard
+    /// profile files (`~/.aws/credentials` and `~/.aws/config`).
+    ///
+    /// This function uses `ProfileFileCredentialsProvider` to read credentials,
+    /// which limits the search to only the configuration files and excludes other
+    /// sources like environment variables or IAM roles.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` with `S3ClientOptions` containing the access key and secret key,
+    /// or a `PrefixloadError` on failure.
+    pub async fn from_aws_config() -> Result<Self> {
+        let provider = ProfileFileCredentialsProvider::builder().build();
+
+        let credentials = provider.provide_credentials().await.map_err(|err| {
+            PrefixloadError::Custom(format!(
+                "Failed to load credentials from AWS profile: {}",
+                err
+            ))
+        })?;
+
+        Ok(Self {
+            access_key: credentials.access_key_id().to_string(),
+            secret_key: credentials.secret_access_key().to_string(),
+            ..Self::default()
+        })
+    }
+
     /// Sets the access key.
     pub fn with_access_key<S: Into<String>>(mut self, access_key: S) -> Self {
         self.access_key = access_key.into();

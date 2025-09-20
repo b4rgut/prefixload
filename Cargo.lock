@@ -2049,6 +2049,7 @@ name = "prefixload"
 version = "0.11.3"
 dependencies = [
  "aws-config",
+ "aws-credential-types",
  "aws-sdk-s3",
  "aws-types",
  "clap",
