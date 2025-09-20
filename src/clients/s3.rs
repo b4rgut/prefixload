@@ -171,6 +171,9 @@ impl S3Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
+    use std::fs;
+    use tempfile::tempdir;
     use wiremock::matchers::{header, header_exists, method, path_regex};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -376,5 +379,80 @@ mod tests {
         assert_eq!(opts.region, None);
         assert_eq!(opts.endpoint, None);
         assert!(!opts.force_path_style);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn from_aws_config_success() {
+        let dir = tempdir().unwrap();
+        let aws_dir = dir.path().join(".aws");
+        fs::create_dir(&aws_dir).unwrap();
+        let credentials_path = aws_dir.join("credentials");
+        fs::write(
+            &credentials_path,
+            "[default]\naws_access_key_id = MY_ACCESS_KEY\naws_secret_access_key = MY_SECRET_KEY\n",
+        )
+        .unwrap();
+
+        // Set HOME to our temporary directory. This is unsafe.
+        unsafe {
+            std::env::set_var("HOME", dir.path());
+            // Also set env vars to ensure the file provider is preferred.
+            std::env::set_var("AWS_ACCESS_KEY_ID", "env_key");
+            std::env::set_var("AWS_SECRET_ACCESS_KEY", "env_secret");
+        }
+
+        let opts = S3ClientOptions::from_aws_config().await.unwrap();
+
+        assert_eq!(opts.access_key, "MY_ACCESS_KEY");
+        assert_eq!(opts.secret_key, "MY_SECRET_KEY");
+
+        // Unset the env var to avoid interfering with other tests.
+        unsafe {
+            std::env::remove_var("HOME");
+            std::env::remove_var("AWS_ACCESS_KEY_ID");
+            std::env::remove_var("AWS_SECRET_ACCESS_KEY");
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn from_aws_config_file_not_found() {
+        let dir = tempdir().unwrap();
+        unsafe {
+            std::env::set_var("HOME", dir.path());
+        }
+
+        let result = S3ClientOptions::from_aws_config().await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Failed to load credentials from AWS profile"));
+
+        unsafe {
+            std::env::remove_var("HOME");
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn from_aws_config_missing_keys() {
+        let dir = tempdir().unwrap();
+        let aws_dir = dir.path().join(".aws");
+        fs::create_dir(&aws_dir).unwrap();
+        let credentials_path = aws_dir.join("credentials");
+        fs::write(&credentials_path, "[default]\nwrong_key = value\n").unwrap();
+
+        unsafe {
+            std::env::set_var("HOME", dir.path());
+        }
+
+        let result = S3ClientOptions::from_aws_config().await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Failed to load credentials from AWS profile"));
+
+        unsafe {
+            std::env::remove_var("HOME");
+        }
     }
 }
