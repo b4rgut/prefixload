@@ -158,7 +158,10 @@ pub async fn run(quiet: bool) -> Result<String> {
                     ));
                     skipped_count += 1;
                 } else {
-                    logger.log(&format!("  - Object <{}> is not synced. Uploading...", file_name));
+                    logger.log(&format!(
+                        "  - Object <{}> is not synced. Uploading...",
+                        file_name
+                    ));
                     s3_client
                         .upload_file(&config.bucket, &remote_key, file_path)
                         .await?;
@@ -187,5 +190,263 @@ pub async fn run(quiet: bool) -> Result<String> {
         Ok("".to_string())
     } else {
         Ok(final_message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{Config, DirectoryEntry};
+    use serial_test::serial;
+    use std::env;
+    use tempfile::{TempDir, tempdir};
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    // Environment variable helpers
+    #[cfg(windows)]
+    const CONFIG_ENV: &str = "APPDATA";
+    #[cfg(not(windows))]
+    const CONFIG_ENV: &str = "XDG_CONFIG_HOME";
+
+    #[cfg(windows)]
+    const DATA_LOCAL_ENV: &str = "LOCALAPPDATA";
+    #[cfg(not(windows))]
+    const DATA_LOCAL_ENV: &str = "XDG_DATA_HOME";
+
+    #[cfg(windows)]
+    const HOME_ENV: &str = "USERPROFILE";
+    #[cfg(not(windows))]
+    const HOME_ENV: &str = "HOME";
+
+    /// A test harness to sandbox the filesystem and network.
+    struct TestHarness {
+        pub config: Config,
+        pub server: MockServer,
+        // Temp Dirs are held to prevent them from being dropped and deleted
+        _config_dir: TempDir,
+        _data_dir: TempDir,
+        _home_dir: TempDir,
+        pub local_files_dir: TempDir,
+    }
+
+    /// Sets up a fully sandboxed test environment.
+    async fn setup(rules: Vec<DirectoryEntry>, part_size: u64) -> TestHarness {
+        let server = MockServer::start().await;
+        let config_dir = tempdir().unwrap();
+        let data_dir = tempdir().unwrap();
+        let home_dir = tempdir().unwrap();
+        let local_files_dir = tempdir().unwrap();
+
+        // Set env vars to point to our temp dirs
+        unsafe {
+            env::set_var(CONFIG_ENV, config_dir.path());
+            env::set_var(DATA_LOCAL_ENV, data_dir.path());
+            env::set_var(HOME_ENV, home_dir.path());
+        }
+
+        // Create dummy AWS credentials file
+        let aws_dir = home_dir.path().join(".aws");
+        fs::create_dir(&aws_dir).unwrap();
+        fs::write(
+            aws_dir.join("credentials"),
+            "[default]\naws_access_key_id=TESTKEY\naws_secret_access_key=TESTSECRET",
+        )
+        .unwrap();
+
+        // Create a config object pointing to our test setup
+        let config = Config {
+            endpoint: server.uri(),
+            bucket: "test-bucket".to_string(),
+            region: "us-east-1".to_string(),
+            force_path_style: true,
+            part_size,
+            local_directory_path: local_files_dir.path().to_path_buf(),
+            directory_struct: rules,
+        };
+
+        // Write the config file
+        let config_path = config_dir.path().join("prefixload/config.yml");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        fs::write(config_path, serde_yaml::to_string(&config).unwrap()).unwrap();
+
+        TestHarness {
+            config,
+            server,
+            _config_dir: config_dir,
+            _data_dir: data_dir,
+            _home_dir: home_dir,
+            local_files_dir,
+        }
+    }
+
+    /// Helper to create a temporary file with content.
+    fn create_temp_file(dir: &Path, name: &str, content: &[u8]) -> PathBuf {
+        let file_path = dir.join(name);
+        let mut file = File::create(&file_path).unwrap();
+        file.write_all(content).unwrap();
+        file_path
+    }
+
+    #[test]
+    fn test_get_local_files() {
+        let dir = tempdir().unwrap();
+        create_temp_file(dir.path(), "file1.txt", b"hello");
+        create_temp_file(dir.path(), "file2.txt", b"world");
+        fs::create_dir(dir.path().join("subdir")).unwrap();
+
+        let files = get_local_files(dir.path()).unwrap();
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().any(|p| p.ends_with("file1.txt")));
+        assert!(files.iter().any(|p| p.ends_with("file2.txt")));
+    }
+
+    #[test]
+    fn test_get_local_files_invalid_dir() {
+        let result = get_local_files(Path::new("/non/existent/dir"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[serial]
+    fn test_logger_quiet_mode() {
+        let data_dir = tempdir().unwrap();
+        unsafe {
+            env::set_var(DATA_LOCAL_ENV, data_dir.path());
+        }
+
+        let mut logger = Logger::new(true).unwrap();
+        logger.log("test message");
+
+        let log_file_path = data_dir.path().join("prefixload/run.log");
+        assert!(log_file_path.exists());
+        let log_content = fs::read_to_string(log_file_path).unwrap();
+        assert!(log_content.contains("test message"));
+
+        unsafe {
+            env::remove_var(DATA_LOCAL_ENV);
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_run_uploads_new_file() {
+        let harness = setup(
+            vec![DirectoryEntry {
+                local_name_prefix: "backup_".to_string(),
+                remote_path: "backups".to_string(),
+            }],
+            5 * 1024 * 1024, // 5MB
+        )
+        .await;
+
+        let file_content = b"this is a new backup";
+        create_temp_file(harness.local_files_dir.path(), "backup_1.txt", file_content);
+
+        // Mock S3: is_object_synced returns 404, upload returns 200
+        Mock::given(method("HEAD"))
+            .and(path("/test-bucket/backups/backup_1.txt"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&harness.server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path("/test-bucket/backups/backup_1.txt"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&harness.server)
+            .await;
+
+        let result = run(false).await.unwrap();
+        assert!(result.contains("Matched: 1, Uploaded: 1, Skipped: 0"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_run_skips_synced_file() {
+        let harness = setup(
+            vec![DirectoryEntry {
+                local_name_prefix: "db_".to_string(),
+                remote_path: "db".to_string(),
+            }],
+            5 * 1024 * 1024,
+        )
+        .await;
+
+        let file_content = b"this is a synced backup";
+        let file_path = create_temp_file(harness.local_files_dir.path(), "db_1.sql", file_content);
+        let etag = calculate_s3_etag(file_path, harness.config.part_size).unwrap();
+
+        // Mock S3: is_object_synced returns 200 with matching ETag
+        Mock::given(method("HEAD"))
+            .and(path("/test-bucket/db/db_1.sql"))
+            .respond_with(ResponseTemplate::new(200).insert_header("ETag", format!("\"{}\"", etag)))
+            .mount(&harness.server)
+            .await;
+
+        let result = run(false).await.unwrap();
+        assert!(result.contains("Matched: 1, Uploaded: 0, Skipped: 1"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_run_ignores_unmatched_file() {
+        let harness = setup(
+            vec![DirectoryEntry {
+                local_name_prefix: "backup_".to_string(),
+                remote_path: "backups".to_string(),
+            }],
+            5 * 1024 * 1024,
+        )
+        .await;
+
+        create_temp_file(
+            harness.local_files_dir.path(),
+            "some_other_file.txt",
+            b"ignore me",
+        );
+
+        // No mocks needed as no S3 calls should be made
+
+        let result = run(false).await.unwrap();
+        assert!(result.contains("Matched: 0, Uploaded: 0, Skipped: 0"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_run_quiet_mode_logs_to_file() {
+        let harness = setup(
+            vec![DirectoryEntry {
+                local_name_prefix: "backup_".to_string(),
+                remote_path: "backups".to_string(),
+            }],
+            5 * 1024 * 1024,
+        )
+        .await;
+
+        create_temp_file(harness.local_files_dir.path(), "backup_1.txt", b"content");
+
+        // Mock S3 to simulate an upload
+        Mock::given(method("HEAD"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&harness.server)
+            .await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&harness.server)
+            .await;
+
+        // Run in quiet mode
+        let result = run(true).await.unwrap();
+        assert_eq!(result, ""); // Should return an empty string
+
+        // Check the log file
+        let log_file_path = harness._data_dir.path().join("prefixload/run.log");
+        assert!(log_file_path.exists());
+        let log_content = fs::read_to_string(log_file_path).unwrap();
+
+        assert!(log_content.contains("Starting prefixload run"));
+        assert!(log_content.contains("Processing matched file"));
+        assert!(log_content.contains("Object <backup_1.txt> is not synced. Uploading"));
+        assert!(log_content.contains("Run finished"));
+        assert!(log_content.contains("Matched: 1, Uploaded: 1, Skipped: 0"));
     }
 }
