@@ -6,7 +6,9 @@ use aws_sdk_s3::config::Builder as S3ConfigBuilder;
 use aws_sdk_s3::config::Credentials;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
+use aws_sdk_s3::primitives::ByteStream;
 use aws_types::region::Region;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct S3Client {
@@ -212,6 +214,35 @@ impl S3Client {
             },
             Err(sdk_err) => Err(aws_sdk_s3::Error::from(sdk_err).into()),
         }
+    }
+
+    /// Uploads a file to the specified S3 bucket.
+    ///
+    /// This method streams the file from disk, making it suitable for large files.
+    ///
+    /// # Parameters
+    /// - `bucket`: The name of the S3 bucket.
+    /// - `object_name`: The name for the object in S3.
+    /// - `path`: The local path to the file to upload.
+    ///
+    /// # Returns
+    /// - `Ok(())` on successful upload.
+    /// - `Err` if the file cannot be read or the upload fails.
+    pub async fn upload_file(&self, bucket: &str, object_name: &str, path: &Path) -> Result<()> {
+        let body = ByteStream::from_path(path).await.map_err(|e| {
+            PrefixloadError::Custom(format!("Failed to read file {}: {}", path.display(), e))
+        })?;
+
+        self.inner
+            .put_object()
+            .bucket(bucket)
+            .key(object_name)
+            .content_type("application/octet-stream")
+            .body(body)
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|err| aws_sdk_s3::Error::from(err).into())
     }
 }
 
@@ -605,5 +636,87 @@ mod tests {
         let result = s3_client.is_object_synced(md5, bucket, object_name).await;
 
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn upload_file_success() {
+        // 1. Setup mock server
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "upload-bucket";
+        let object_name = "upload-object";
+
+        // 2. Create a temporary file with content
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_file.txt");
+        let file_content = "hello world";
+        fs::write(&file_path, file_content).unwrap();
+
+        // 3. Mock the S3 PUT request
+        Mock::given(method("PUT"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .and(header("content-type", "application/octet-stream"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        // 4. Call the function
+        let result = s3_client
+            .upload_file(bucket, object_name, &file_path)
+            .await;
+
+        // 5. Assert success
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn upload_file_server_error() {
+        // 1. Setup mock server
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "upload-bucket";
+        let object_name = "upload-object-fail";
+
+        // 2. Create a temporary file
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_file.txt");
+        fs::write(&file_path, "content").unwrap();
+
+        // 3. Mock the S3 PUT request to return an error
+        Mock::given(method("PUT"))
+            .and(path_regex(format!("/{}/{}", bucket, object_name)))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&server)
+            .await;
+
+        // 4. Call the function
+        let result = s3_client
+            .upload_file(bucket, object_name, &file_path)
+            .await;
+
+        // 5. Assert error
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn upload_file_not_found() {
+        let server = MockServer::start().await;
+        let s3_client = client(&server).await;
+        let bucket = "any-bucket";
+        let object_name = "any-object";
+        let non_existent_path = Path::new("non_existent_file.txt");
+
+        // No need to mock the server, as it should fail before the request.
+
+        let result = s3_client
+            .upload_file(bucket, object_name, non_existent_path)
+            .await;
+
+        assert!(result.is_err());
+        if let Err(PrefixloadError::Custom(msg)) = result {
+            assert!(msg.contains("Failed to read file"));
+        } else {
+            panic!("Expected a custom error for file not found");
+        }
     }
 }
