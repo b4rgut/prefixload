@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1](https://github.com/b4rgut/prefixload/compare/v0.12.0...v0.12.1) - 2025-09-21
+
+### Other
+
+- update README with detailed usage and configuration info
+
 ## [0.12.0](https://github.com/b4rgut/prefixload/compare/v0.11.3...v0.12.0) - 2025-09-21
 
 ### Added
