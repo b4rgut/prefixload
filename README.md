@@ -1,5 +1,7 @@
 [![crates.io](https://img.shields.io/crates/v/prefixload.svg)](https://crates.io/crates/prefixload)
 
+**🇺🇸 English | [🇷🇺 Русский](README_RU.md)**
+
 # Prefixload
 
 Prefixload is a small command-line utility written in Rust that periodically uploads files from a local directory to an Amazon S3 or S3-compatible bucket. It selects files for upload based on configurable filename prefixes.
