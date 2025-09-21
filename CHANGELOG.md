@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/b4rgut/prefixload/compare/v0.11.3...v0.12.0) - 2025-09-21
+
+### Added
+
+- *(cli/commands/run)* add run command implementation with S3 sync
+- *(clients/s3)* add S3 file upload functionality with tests
+- *(clients/s3)* add S3 object sync check via HEAD request and ETag
+- *(clients/s3)* add S3 client method to load credentials from AWS
+
+### Other
+
+- *(cli/commands/run)* add comprehensive test suite for run command
+- *(clients/s3)* add tests for AWS credentials loading from config file
+- *(crypto/etag)* S3 ETag calculation for memory efficiency
+
 ## [0.11.3](https://github.com/b4rgut/prefixload/compare/v0.11.2...v0.11.3) - 2025-09-18
 
 ### Added
