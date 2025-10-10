@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.3](https://github.com/b4rgut/prefixload/compare/v0.12.2...v0.12.3) - 2025-10-10
+
+### Other
+
+- add a badge for CI in README.md
+
 ## [0.12.2](https://github.com/b4rgut/prefixload/compare/v0.12.1...v0.12.2) - 2025-09-22
 
 ### Other
