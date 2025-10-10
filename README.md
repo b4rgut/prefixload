@@ -1,3 +1,4 @@
+[![CI](https://github.com/b4rgut/prefixload/actions/workflows/release.yml/badge.svg)](https://github.com/b4rgut/prefixload/actions/workflows/release.yml)
 [![crates.io](https://img.shields.io/crates/v/prefixload.svg)](https://crates.io/crates/prefixload)
 
 **🇺🇸 English | [🇷🇺 Русский](README_RU.md)**
